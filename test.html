@@ -1,0 +1,19 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SWOTT ChatKit Test</title>
+  <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js"></script>
+</head>
+<body>
+  <openai-chatkit id="my-chat" style="height:600px;width:400px;display:block;"></openai-chatkit>
+  <script>
+    const chatkit = document.getElementById('my-chat');
+    chatkit.setOptions({
+      api: {
+        url: 'http://localhost:8000/chatkit',
+        domainKey: 'swott'
+      }
+    });
+  </script>
+</body>
+</html>
