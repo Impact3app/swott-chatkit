@@ -1,5 +1,6 @@
 import os
 import uuid
+import base64
 import httpx
 from datetime import datetime, timezone
 from fastapi import FastAPI, Request
@@ -14,11 +15,12 @@ from chatkit.types import (
     AssistantMessageContentPartDone,
     AssistantMessageContentPartAdded,
     ThreadItemAddedEvent, ThreadItemDoneEvent,
-    UserMessageItem
+    UserMessageItem, Attachment
 )
 from typing import Any, AsyncIterator
 
 SWOTT_BACKEND_URL = os.environ.get("SWOTT_BACKEND_URL", "http://localhost:3000")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 
 
 class InMemoryStore(Store):
@@ -26,6 +28,7 @@ class InMemoryStore(Store):
         self._threads = {}
         self._items = {}
         self._attachments = {}
+        self._user_files = {}  # session_id -> list of extracted texts
 
     async def load_thread(self, thread_id, context):
         if thread_id not in self._threads:
@@ -84,10 +87,100 @@ class InMemoryStore(Store):
     async def delete_attachment(self, attachment_id, context):
         self._attachments.pop(attachment_id, None)
 
+    def add_user_file(self, session_id: str, filename: str, content: str):
+        if session_id not in self._user_files:
+            self._user_files[session_id] = []
+        self._user_files[session_id].append({
+            "filename": filename,
+            "content": content
+        })
+        print(f">>> Fichier ajouté pour session {session_id}: {filename} ({len(content)} chars)")
+
+    def get_user_files(self, session_id: str):
+        return self._user_files.get(session_id, [])
+
+    def clear_user_files(self, session_id: str):
+        self._user_files.pop(session_id, None)
+
+
+def extract_text_from_file(filename: str, content_bytes: bytes) -> str:
+    """Extrait le texte d'un fichier PDF, Word ou Excel"""
+    ext = filename.lower().split('.')[-1]
+
+    try:
+        if ext == 'pdf':
+            import io
+            try:
+                import PyPDF2
+                reader = PyPDF2.PdfReader(io.BytesIO(content_bytes))
+                text = ""
+                for page in reader.pages:
+                    text += page.extract_text() + "\n"
+                return text.strip()
+            except ImportError:
+                return f"[PDF reçu: {filename} - installez PyPDF2 pour l'extraction]"
+
+        elif ext in ['docx', 'doc']:
+            import io
+            try:
+                import docx
+                doc = docx.Document(io.BytesIO(content_bytes))
+                text = "\n".join([para.text for para in doc.paragraphs])
+                return text.strip()
+            except ImportError:
+                return f"[Word reçu: {filename} - installez python-docx pour l'extraction]"
+
+        elif ext in ['xlsx', 'xls']:
+            import io
+            try:
+                import openpyxl
+                wb = openpyxl.load_workbook(io.BytesIO(content_bytes))
+                text = ""
+                for sheet in wb.worksheets:
+                    text += f"\n[Feuille: {sheet.title}]\n"
+                    for row in sheet.iter_rows(values_only=True):
+                        row_text = "\t".join([str(c) if c is not None else "" for c in row])
+                        if row_text.strip():
+                            text += row_text + "\n"
+                return text.strip()
+            except ImportError:
+                return f"[Excel reçu: {filename} - installez openpyxl pour l'extraction]"
+
+        elif ext == 'txt':
+            return content_bytes.decode('utf-8', errors='ignore')
+
+        else:
+            return f"[Fichier reçu: {filename} - format non supporté pour extraction]"
+
+    except Exception as e:
+        return f"[Erreur extraction {filename}: {str(e)}]"
+
 
 class SwottChatKitServer(ChatKitServer):
-    def __init__(self, data_store):
+    def __init__(self, data_store: InMemoryStore):
         super().__init__(data_store)
+        self.data_store = data_store
+
+    async def create_attachment(self, params, context):
+        """Intercepte l'upload de fichier et extrait le texte"""
+        attachment = await super().create_attachment(params, context)
+
+        try:
+            filename = getattr(params, 'filename', None) or getattr(params, 'name', 'fichier')
+            content_bytes = getattr(params, 'content', None)
+
+            if content_bytes:
+                if isinstance(content_bytes, str):
+                    content_bytes = base64.b64decode(content_bytes)
+
+                text = extract_text_from_file(filename, content_bytes)
+                session_id = context.get('session_id', 'unknown') if isinstance(context, dict) else 'unknown'
+                self.data_store.add_user_file(session_id, filename, text)
+
+        except Exception as e:
+            print(f">>> Erreur lors de l'extraction du fichier: {e}")
+
+        return attachment
 
     async def respond(self, thread: ThreadMetadata, input: UserMessageItem | None, context: Any) -> AsyncIterator[Any]:
         message_text = ""
@@ -99,9 +192,19 @@ class SwottChatKitServer(ChatKitServer):
                     if hasattr(part, "text"):
                         message_text += part.text
 
-        print(f">>> Message recu: {message_text}")
+        # Récupérer les fichiers uploadés pour cette session
+        user_files = self.data_store.get_user_files(thread.id)
+        if user_files:
+            files_context = "\n\n---DOCUMENTS FOURNIS PAR L'UTILISATEUR---\n"
+            for f in user_files:
+                files_context += f"\n[Fichier: {f['filename']}]\n{f['content']}\n"
+            files_context += "---FIN DES DOCUMENTS---\n"
+            message_text = message_text + files_context
+            print(f">>> {len(user_files)} fichier(s) injecté(s) dans le message")
 
-        async with httpx.AsyncClient(timeout=60) as client:
+        print(f">>> Message recu: {message_text[:100]}")
+
+        async with httpx.AsyncClient(timeout=120) as client:
             response = await client.post(
                 f"{SWOTT_BACKEND_URL}/chat",
                 json={"session_id": thread.id, "message": message_text}
@@ -114,7 +217,6 @@ class SwottChatKitServer(ChatKitServer):
         item_id = f"msg_{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc)
 
-        # Créer l'item assistant
         assistant_item = AssistantMessageItem(
             id=item_id,
             thread_id=thread.id,
@@ -122,10 +224,8 @@ class SwottChatKitServer(ChatKitServer):
             content=[AssistantMessageContent(type="output_text", text="", annotations=[])]
         )
 
-        # Signaler au framework que l'item est ajouté
         yield ThreadItemAddedEvent(item=assistant_item)
 
-        # Streamer le texte mot par mot
         yield AssistantMessageContentPartAdded(
             content_index=0,
             content={"type": "output_text", "text": ""}
@@ -141,7 +241,6 @@ class SwottChatKitServer(ChatKitServer):
             content={"type": "output_text", "text": response_text}
         )
 
-        # Item final avec le texte complet
         final_item = AssistantMessageItem(
             id=item_id,
             thread_id=thread.id,

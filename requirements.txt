@@ -3,3 +3,6 @@ fastapi
 uvicorn[standard]
 httpx
 python-dotenv
+PyPDF2
+python-docx
+openpyxl
