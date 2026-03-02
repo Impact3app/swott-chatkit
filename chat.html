@@ -374,7 +374,7 @@
 <input type="file" id="file-input" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt" multiple onchange="handleFiles(this)">
 
 <script>
-  const API = 'http://localhost:8000/chatkit';
+  const API = 'https://web-production-d7a5f.up.railway.app/chatkit';
   const DOMAIN_KEY = 'swott';
   let threadId = 'thread_' + Math.random().toString(36).substr(2, 9);
   let attachments = [];
