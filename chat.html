@@ -1,0 +1,558 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SWOTT Assistant</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Inter', sans-serif;
+      background: #f9f9f9;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      height: 100vh;
+    }
+
+    .chat-wrapper {
+      width: 420px;
+      height: 680px;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.10);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      border: 1px solid #e5e5e5;
+    }
+
+    /* Header */
+    .header {
+      padding: 16px 20px;
+      border-bottom: 1px solid #f0f0f0;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .header-avatar {
+      width: 32px;
+      height: 32px;
+      background: #000;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 14px;
+      font-weight: 600;
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: #111;
+    }
+
+    .header-sub {
+      font-size: 12px;
+      color: #999;
+    }
+
+    /* Messages */
+    .messages {
+      flex: 1;
+      overflow-y: auto;
+      padding: 20px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      scroll-behavior: smooth;
+    }
+
+    .messages::-webkit-scrollbar { width: 4px; }
+    .messages::-webkit-scrollbar-thumb { background: #e0e0e0; border-radius: 4px; }
+
+    .welcome {
+      text-align: center;
+      padding: 32px 16px;
+      color: #999;
+      font-size: 14px;
+      line-height: 1.6;
+    }
+
+    .welcome strong {
+      display: block;
+      font-size: 16px;
+      color: #333;
+      margin-bottom: 6px;
+    }
+
+    .message {
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+      animation: fadeIn 0.2s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(4px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .message.user {
+      flex-direction: row-reverse;
+    }
+
+    .msg-avatar {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      margin-top: 2px;
+    }
+
+    .message.user .msg-avatar {
+      background: #e8e8e8;
+      color: #555;
+    }
+
+    .message.assistant .msg-avatar {
+      background: #000;
+      color: #fff;
+    }
+
+    .bubble h1, .bubble h2, .bubble h3 {
+      font-size: 1em;
+      font-weight: 600;
+      margin: 0.6em 0 0.3em;
+    }
+    .bubble p { margin: 0.3em 0; }
+    .bubble ul, .bubble ol {
+      margin: 0.3em 0;
+      padding-left: 1.4em;
+    }
+    .bubble li { margin: 0.15em 0; }
+    .bubble strong { font-weight: 600; }
+    .bubble code {
+      background: #f0f0f0;
+      border-radius: 3px;
+      padding: 0.1em 0.3em;
+      font-family: monospace;
+      font-size: 0.9em;
+    }
+    .bubble pre {
+      background: #f4f4f4;
+      border-radius: 6px;
+      padding: 0.7em;
+      overflow-x: auto;
+      margin: 0.4em 0;
+    }
+    .bubble pre code { background: none; padding: 0; }
+    .bubble {
+      max-width: 80%;
+      padding: 10px 14px;
+      border-radius: 16px;
+      font-size: 14px;
+      line-height: 1.6;
+      color: #111;
+    }
+
+    .message.user .bubble {
+      background: #f0f0f0;
+      border-bottom-right-radius: 4px;
+    }
+
+    .message.assistant .bubble {
+      background: #fff;
+      border: 1px solid #ebebeb;
+      border-bottom-left-radius: 4px;
+    }
+
+    /* File chip in bubble */
+    .file-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f5f5f5;
+      border: 1px solid #e0e0e0;
+      border-radius: 8px;
+      padding: 4px 10px;
+      font-size: 12px;
+      color: #555;
+      margin-bottom: 6px;
+    }
+
+    /* Typing dots */
+    .typing {
+      display: flex;
+      gap: 4px;
+      padding: 4px 2px;
+    }
+
+    .typing span {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #bbb;
+      animation: bounce 1.2s infinite;
+    }
+
+    .typing span:nth-child(2) { animation-delay: 0.2s; }
+    .typing span:nth-child(3) { animation-delay: 0.4s; }
+
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); opacity: 0.4; }
+      50% { transform: translateY(-4px); opacity: 1; }
+    }
+
+    /* Attachment preview bar */
+    .attachments-bar {
+      padding: 8px 16px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+    }
+
+    .att-chip {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #f5f5f5;
+      border: 1px solid #e0e0e0;
+      border-radius: 20px;
+      padding: 4px 10px 4px 8px;
+      font-size: 12px;
+      color: #444;
+      animation: fadeIn 0.2s ease;
+    }
+
+    .att-chip .remove {
+      cursor: pointer;
+      color: #aaa;
+      font-size: 14px;
+      line-height: 1;
+      background: none;
+      border: none;
+      padding: 0;
+      margin-left: 2px;
+    }
+
+    .att-chip .remove:hover { color: #e00; }
+
+    /* Input area */
+    .input-area {
+      padding: 10px 16px 16px;
+    }
+
+    .input-box {
+      display: flex;
+      align-items: flex-end;
+      gap: 8px;
+      background: #f7f7f7;
+      border: 1px solid #e5e5e5;
+      border-radius: 12px;
+      padding: 8px 10px;
+      transition: border-color 0.2s;
+    }
+
+    .input-box:focus-within {
+      border-color: #ccc;
+      background: #fff;
+    }
+
+    .btn-attach {
+      background: none;
+      border: none;
+      cursor: pointer;
+      color: #aaa;
+      padding: 3px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      transition: color 0.2s;
+      flex-shrink: 0;
+    }
+
+    .btn-attach:hover { color: #555; }
+
+    textarea {
+      flex: 1;
+      background: none;
+      border: none;
+      outline: none;
+      font-family: 'Inter', sans-serif;
+      font-size: 14px;
+      color: #111;
+      resize: none;
+      min-height: 22px;
+      max-height: 100px;
+      line-height: 1.5;
+    }
+
+    textarea::placeholder { color: #bbb; }
+
+    .btn-send {
+      width: 32px;
+      height: 32px;
+      background: #000;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+      transition: opacity 0.2s;
+    }
+
+    .btn-send:hover { opacity: 0.8; }
+    .btn-send:disabled { opacity: 0.3; cursor: default; }
+
+    .btn-send svg { color: white; }
+
+    #file-input { display: none; }
+
+    .hint {
+      text-align: center;
+      font-size: 11px;
+      color: #ccc;
+      margin-top: 8px;
+    }
+  </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
+</head>
+<body>
+
+<div class="chat-wrapper">
+  <div class="header">
+    <div class="header-avatar">S</div>
+    <div>
+      <div class="header-title">SWOTT Assistant</div>
+      <div class="header-sub">Intelligence Achats</div>
+    </div>
+  </div>
+
+  <div class="messages" id="messages">
+    <div class="welcome" id="welcome">
+      <strong>Bonjour 👋</strong>
+      Posez votre question ou joignez un document PDF, Word ou Excel.
+    </div>
+  </div>
+
+  <div class="attachments-bar" id="attachments-bar"></div>
+
+  <div class="input-area">
+    <div class="input-box">
+      <button class="btn-attach" onclick="document.getElementById('file-input').click()" title="Joindre un fichier">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/>
+        </svg>
+      </button>
+      <textarea id="input" placeholder="Écrivez un message…" rows="1"
+        onkeydown="handleKey(event)" oninput="autoResize(this)"></textarea>
+      <button class="btn-send" id="send-btn" onclick="sendMessage()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+          <line x1="22" y1="2" x2="11" y2="13"/>
+          <polygon points="22 2 15 22 11 13 2 9 22 2"/>
+        </svg>
+      </button>
+    </div>
+    <div class="hint">PDF · Word · Excel supportés</div>
+  </div>
+</div>
+
+<input type="file" id="file-input" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt" multiple onchange="handleFiles(this)">
+
+<script>
+  const API = 'http://localhost:8000/chatkit';
+  const DOMAIN_KEY = 'swott';
+  let threadId = 'thread_' + Math.random().toString(36).substr(2, 9);
+  let attachments = [];
+  let loading = false;
+
+  function autoResize(el) {
+    el.style.height = '22px';
+    el.style.height = Math.min(el.scrollHeight, 100) + 'px';
+  }
+
+  function handleKey(e) {
+    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
+  }
+
+  function handleFiles(input) {
+    Array.from(input.files).forEach(file => {
+      const id = Math.random().toString(36).substr(2, 9);
+      attachments.push({ id, file });
+      const bar = document.getElementById('attachments-bar');
+      const chip = document.createElement('div');
+      chip.className = 'att-chip';
+      chip.id = 'chip_' + id;
+      chip.innerHTML = `📄 ${file.name} <button class="remove" onclick="removeAtt('${id}')">✕</button>`;
+      bar.appendChild(chip);
+    });
+    input.value = '';
+  }
+
+  function removeAtt(id) {
+    attachments = attachments.filter(a => a.id !== id);
+    document.getElementById('chip_' + id)?.remove();
+  }
+
+  function addMsg(role, html) {
+    document.getElementById('welcome')?.remove();
+    const msgs = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = 'message ' + role;
+    const label = role === 'user' ? 'V' : 'S';
+    div.innerHTML = `<div class="msg-avatar">${label}</div><div class="bubble">${html}</div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+    return div.querySelector('.bubble');
+  }
+
+  function addThinking() {
+    document.getElementById('welcome')?.remove();
+    const msgs = document.getElementById('messages');
+    const div = document.createElement('div');
+    div.className = 'message assistant';
+    div.id = 'thinking';
+    div.innerHTML = `<div class="msg-avatar">S</div><div class="bubble"><div class="typing"><span></span><span></span><span></span></div></div>`;
+    msgs.appendChild(div);
+    msgs.scrollTop = msgs.scrollHeight;
+  }
+
+  async function uploadFile(file) {
+    return new Promise(resolve => {
+      const reader = new FileReader();
+      reader.onload = async e => {
+        const base64 = e.target.result.split(',')[1];
+        try {
+          const res = await fetch(API, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              type: 'attachments.create',
+              params: { thread_id: threadId, name: file.name, content_type: file.type || 'application/octet-stream', mime_type: file.type || 'application/octet-stream', size: file.size, content: base64 }
+            })
+          });
+          resolve(await res.json());
+        } catch { resolve(null); }
+      };
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function sendMessage() {
+    if (loading) return;
+    const input = document.getElementById('input');
+    const text = input.value.trim();
+    if (!text && attachments.length === 0) return;
+
+    loading = true;
+    document.getElementById('send-btn').disabled = true;
+
+    // User bubble
+    let userHtml = '';
+    if (attachments.length > 0) {
+      userHtml += attachments.map(a => `<div class="file-chip">📄 ${a.file.name}</div>`).join('');
+    }
+    if (text) userHtml += `<div>${text}</div>`;
+    addMsg('user', userHtml);
+
+    input.value = '';
+    input.style.height = '22px';
+
+    // Upload files
+    const attIds = [];
+    for (const att of attachments) {
+      const r = await uploadFile(att.file);
+      if (r?.id) attIds.push(r.id);
+    }
+    attachments = [];
+    document.getElementById('attachments-bar').innerHTML = '';
+
+    addThinking();
+
+    try {
+      const contentParts = [{ type: 'input_text', text: text || ' ' }];
+      const attachmentRefs = attIds;
+
+      const res = await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          type: 'threads.add_user_message',
+          params: {
+            thread_id: threadId,
+            input: {
+              content: contentParts,
+              attachments: attachmentRefs,
+              inference_options: {}
+            }
+          }
+        })
+      });
+
+      document.getElementById('thinking')?.remove();
+      const bubble = addMsg('assistant', '');
+      let fullText = '';
+
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = '';
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const lines = buf.split('\n');
+        buf = lines.pop();
+        for (const line of lines) {
+          if (!line.startsWith('data: ')) continue;
+          const data = line.slice(6).trim();
+          if (!data || data === '[DONE]') continue;
+          try {
+            const ev = JSON.parse(data);
+            // ChatKit format: thread.item.content_part.delta
+            let delta = '';
+            if (ev.type === 'thread.item.content_part.delta') {
+              delta = ev.delta?.text || ev.delta || '';
+            } else if (ev.delta?.text) {
+              delta = ev.delta.text;
+            } else if (typeof ev.delta === 'string') {
+              delta = ev.delta;
+            }
+            if (delta) {
+              fullText += delta;
+              bubble.innerHTML = marked.parse(fullText);
+              document.getElementById('messages').scrollTop = 99999;
+            }
+          } catch {}
+        }
+      }
+
+      if (!fullText) bubble.innerHTML = '(réponse vide)';
+
+    } catch (err) {
+      document.getElementById('thinking')?.remove();
+      addMsg('assistant', '⚠️ Erreur de connexion au serveur.');
+      console.error(err);
+    }
+
+    loading = false;
+    document.getElementById('send-btn').disabled = false;
+    input.focus();
+  }
+</script>
+</body>
+</html>
