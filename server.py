@@ -204,7 +204,14 @@ def _build_agents():
     return agents
 
 
-AGENTS = _build_agents()
+# Agents initialisés à la première requête (lazy)
+_AGENTS = None
+
+def get_agents():
+    global _AGENTS
+    if _AGENTS is None:
+        _AGENTS = _build_agents()
+    return _AGENTS
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -218,7 +225,7 @@ def _run_config():
     })
 
 async def run_workflow(history: list) -> str:
-    a = AGENTS
+    a = get_agents()
 
     async def _run(agent, h=None):
         inp = list(h) if h is not None else list(history)
