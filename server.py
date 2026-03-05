@@ -141,7 +141,7 @@ class FreyaFastSchema(BaseModel):
 def _build_agents():
     from agents import WebSearchTool, FileSearchTool, CodeInterpreterTool
     web = WebSearchTool()
-    ci  = CodeInterpreterTool()
+    ci  = CodeInterpreterTool(tool_config={"type": "code_interpreter", "container": {"type": "auto"}})
 
     def fs(vs_id):
         return FileSearchTool(vector_store_ids=[vs_id])
