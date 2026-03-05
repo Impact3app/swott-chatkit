@@ -1,4 +1,5 @@
 openai-chatkit
+openai-agents
 fastapi
 uvicorn[standard]
 httpx
@@ -6,3 +7,4 @@ python-dotenv
 PyPDF2
 python-docx
 openpyxl
+supabase
