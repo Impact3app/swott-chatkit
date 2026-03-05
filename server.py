@@ -139,11 +139,12 @@ class FreyaFastSchema(BaseModel):
 
 
 def _build_agents():
-    web = {"type": "web_search_preview"}
-    ci  = {"type": "code_interpreter", "container": {"type": "auto", "file_ids": []}}
+    from agents import WebSearchTool, FileSearchTool, CodeInterpreterTool
+    web = WebSearchTool()
+    ci  = CodeInterpreterTool()
 
     def fs(vs_id):
-        return {"type": "file_search", "vector_store_ids": [vs_id]}
+        return FileSearchTool(vector_store_ids=[vs_id])
 
     classifier = Agent(
         name="Agent_IfElse_JSON",
