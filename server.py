@@ -502,7 +502,9 @@ class SwottChatKitServer(ChatKitServer):
         print(f">>> [{thread.id}] user_id={user_id} msg={message_text[:80]}")
 
         # Appel workflow
+        import re
         response_text = await run_workflow(history)
+        response_text = re.sub(r'filecite\S+', '', response_text).strip()
 
         # Persister dans Supabase
         db_append_message(thread.id, "user", message_text or " ")
