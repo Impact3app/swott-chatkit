@@ -596,13 +596,14 @@ async def get_stats(user_id: str = None):
             if key not in stats:
                 stats[key] = {
                     "user_id": t["user_id"],
-                    "client_name": t.get("client_name") or "—",
+                    "client_name": t.get("client_name") or "",
                     "nb_conversations": 0,
                     "nb_messages": 0,
                     "total_tokens": 0
                 }
             stats[key]["nb_conversations"] += 1
-
+            if not stats[key]["client_name"] and t.get("client_name"):
+                stats[key]["client_name"] = t.get("client_name")
             msgs = supabase.table("messages") \
                 .select("id, tokens_used") \
                 .eq("thread_id", t["thread_id"]) \
@@ -610,8 +611,17 @@ async def get_stats(user_id: str = None):
                 .execute()
             stats[key]["nb_messages"] += len(msgs.data)
             stats[key]["total_tokens"] += sum(m["tokens_used"] or 0 for m in msgs.data)
-
+        for r in stats.values():
+            if not r["client_name"]:
+                r["client_name"] = "—"
         result = list(stats.values())
+```
+
+Sauvegarde puis :
+```
+git add server.py
+git commit -m "Fix client_name dans /stats"
+git push
         if user_id:
             result = [r for r in result if r["user_id"] == user_id]
         return {"stats": sorted(result, key=lambda x: x["total_tokens"], reverse=True)}
