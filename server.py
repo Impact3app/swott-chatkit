@@ -52,7 +52,7 @@ def db_save_thread(thread_id: str, user_id: str, client_name: str = ""):
     except Exception as e:
         print(f"[Supabase] db_save_thread error: {e}")
 
-def db_append_message(thread_id: str, role: str, content: str):
+def db_append_message(thread_id: str, role: str, content: str, tokens_used: int = 0):
     try:
         msg_id = f"{role}_{uuid.uuid4().hex[:12]}"
         supabase.table("messages").insert({
@@ -60,6 +60,7 @@ def db_append_message(thread_id: str, role: str, content: str):
             "thread_id": thread_id,
             "role": role,
             "content": content,
+            "tokens_used": tokens_used,
         }).execute()
     except Exception as e:
         print(f"[Supabase] db_append_message error: {e}")
@@ -509,8 +510,9 @@ db_save_thread(thread.id, user_id, client_name)
         response_text = re.sub(r'filecite\S+', '', response_text).strip()
 
         # Persister dans Supabase
+        tokens = len((message_text or " ").split()) + len(response_text.split())
         db_append_message(thread.id, "user", message_text or " ")
-        db_append_message(thread.id, "assistant", response_text)
+        db_append_message(thread.id, "assistant", response_text, tokens_used=tokens)
 
         print(f">>> Réponse: {response_text[:80]}")
 
