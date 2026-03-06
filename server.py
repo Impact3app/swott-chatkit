@@ -496,7 +496,7 @@ class SwottChatKitServer(ChatKitServer):
 
         # Sauvegarder le thread dans Supabase
         client_name = context.get("client_name", "") if isinstance(context, dict) else ""
-db_save_thread(thread.id, user_id, client_name)
+        db_save_thread(thread.id, user_id, client_name)
 
         # Charger l'historique depuis Supabase
         history = db_get_history(thread.id)
