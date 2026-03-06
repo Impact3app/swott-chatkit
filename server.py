@@ -582,6 +582,41 @@ async def get_threads(user_id: str = "anon"):
     threads = db_get_threads_for_user(user_id)
     return {"user_id": user_id, "threads": threads}
 
+@app.get("/stats")
+async def get_stats(user_id: str = None):
+    try:
+        query = supabase.table("threads") \
+            .select("user_id, client_name, thread_id") \
+            .execute()
+        threads = query.data
+
+        stats = {}
+        for t in threads:
+            key = t["user_id"]
+            if key not in stats:
+                stats[key] = {
+                    "user_id": t["user_id"],
+                    "client_name": t.get("client_name") or "—",
+                    "nb_conversations": 0,
+                    "nb_messages": 0,
+                    "total_tokens": 0
+                }
+            stats[key]["nb_conversations"] += 1
+
+            msgs = supabase.table("messages") \
+                .select("id, tokens_used") \
+                .eq("thread_id", t["thread_id"]) \
+                .eq("role", "assistant") \
+                .execute()
+            stats[key]["nb_messages"] += len(msgs.data)
+            stats[key]["total_tokens"] += sum(m["tokens_used"] or 0 for m in msgs.data)
+
+        result = list(stats.values())
+        if user_id:
+            result = [r for r in result if r["user_id"] == user_id]
+        return {"stats": sorted(result, key=lambda x: x["total_tokens"], reverse=True)}
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.get("/")
 async def healthcheck():
