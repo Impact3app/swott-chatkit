@@ -42,11 +42,12 @@ WORKFLOW_ID = "wf_696b4c50579481908a889f44236f130108bc443970089c82"
 # SUPABASE PERSISTENCE
 # ═══════════════════════════════════════════════════════════════════════════════
 
-def db_save_thread(thread_id: str, user_id: str):
+def db_save_thread(thread_id: str, user_id: str, client_name: str = ""):
     try:
         supabase.table("threads").upsert({
             "thread_id": thread_id,
             "user_id": user_id,
+            "client_name": client_name,
         }).execute()
     except Exception as e:
         print(f"[Supabase] db_save_thread error: {e}")
@@ -493,7 +494,8 @@ class SwottChatKitServer(ChatKitServer):
         user_id = context.get("user_id", "anon") if isinstance(context, dict) else "anon"
 
         # Sauvegarder le thread dans Supabase
-        db_save_thread(thread.id, user_id)
+        client_name = context.get("client_name", "") if isinstance(context, dict) else ""
+db_save_thread(thread.id, user_id, client_name)
 
         # Charger l'historique depuis Supabase
         history = db_get_history(thread.id)
@@ -560,7 +562,8 @@ server     = SwottChatKitServer(data_store, att_store)
 async def chatkit_endpoint(request: Request):
     body    = await request.body()
     user_id = request.headers.get("x-user-id") or request.query_params.get("user_id", "anon")
-    result  = await server.process(body, {"user_id": user_id})
+    client_name = request.headers.get("x-client-name") or request.query_params.get("client_name", "")
+    result  = await server.process(body, {"user_id": user_id, "client_name": client_name})
     if isinstance(result, StreamingResult):
         return StreamingResponse(result, media_type="text/event-stream")
     return Response(content=result.json, media_type="application/json")
