@@ -125,6 +125,23 @@ def db_get_history(thread_id: str) -> list:
         print(f"[Supabase] db_get_history error: {e}")
         return []
 
+def db_upload_file(thread_id: str, att_id: str, filename: str, raw_bytes: bytes, mime_type: str) -> str:
+    """Upload un fichier dans Supabase Storage (bucket 'attachments').
+    Retourne le storage_path ou '' en cas d'erreur."""
+    try:
+        storage_path = f"{thread_id}/{att_id}_{filename}"
+        supabase.storage.from_("attachments").upload(
+            path=storage_path,
+            file=raw_bytes,
+            file_options={"content-type": mime_type}
+        )
+        print(f"[Storage] Fichier uploadé: {storage_path}")
+        return storage_path
+    except Exception as e:
+        print(f"[Storage] Erreur upload: {e}")
+        return ""
+
+
 def db_get_threads_for_user(user_id: str) -> list:
     try:
         res = supabase.table("threads") \
@@ -418,18 +435,22 @@ class InMemoryAttachmentStore(AttachmentStore):
     async def create_attachment(self, input, context):
         att_id = f"att_{uuid.uuid4().hex[:12]}"
         content = getattr(input, "content", None)
+        thread_id = getattr(input, "thread_id", "")
+        name = getattr(input, "name", "fichier")
+        mime_type = getattr(input, "mime_type", "application/octet-stream")
         if content:
             raw = base64.b64decode(content) if isinstance(content, str) else content
             self._bytes[att_id] = raw
-            name = getattr(input, "name", "fichier")
             self._texts[att_id] = extract_text(name, raw)
             print(f">>> Fichier reçu: {name} ({len(raw)} bytes)")
+            # Upload dans Supabase Storage (bucket privé 'attachments')
+            db_upload_file(thread_id, att_id, name, raw, mime_type)
         att = FileAttachment(
             id=att_id,
-            thread_id=getattr(input, "thread_id", ""),
+            thread_id=thread_id,
             created_at=datetime.now(timezone.utc),
-            name=getattr(input, "name", "fichier"),
-            mime_type=getattr(input, "mime_type", "application/octet-stream"),
+            name=name,
+            mime_type=mime_type,
             size=getattr(input, "size", len(self._bytes.get(att_id, b""))),
         )
         self._attachments[att_id] = att
@@ -594,6 +615,32 @@ async def get_history(thread_id: str):
 async def get_threads(user_id: str = "anon"):
     threads = db_get_threads_for_user(user_id)
     return {"user_id": user_id, "threads": threads}
+
+
+@app.get("/download")
+async def download_file(path: str):
+    """Génère une URL signée temporaire (1h) pour télécharger un fichier depuis Supabase Storage."""
+    try:
+        result = supabase.storage.from_("attachments").create_signed_url(path, 3600)
+        if result and result.get("signedURL"):
+            return {"url": result["signedURL"]}
+        return {"error": "Fichier non trouvé"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@app.get("/files/{thread_id}")
+async def list_files(thread_id: str):
+    """Liste les fichiers uploadés dans un thread."""
+    try:
+        files = supabase.storage.from_("attachments").list(thread_id)
+        return {"thread_id": thread_id, "files": [
+            {"name": f["name"], "size": f.get("metadata", {}).get("size", 0),
+             "path": f"{thread_id}/{f['name']}"}
+            for f in files if f.get("name")
+        ]}
+    except Exception as e:
+        return {"thread_id": thread_id, "files": [], "error": str(e)}
 
 
 @app.get("/stats")
