@@ -681,6 +681,18 @@ async def get_stats(user_id: str = None):
     except Exception as e:
         return {"error": str(e)}
 
+@app.get("/test-storage")
+async def test_storage():
+    try:
+        test_data = b"test swott storage"
+        result = supabase.storage.from_("attachments").upload(
+            path="test/test.txt",
+            file=test_data,
+            file_options={"content-type": "text/plain"}
+        )
+        return {"status": "ok", "result": str(result)}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
 
 @app.get("/")
 async def healthcheck():
