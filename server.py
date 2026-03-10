@@ -432,8 +432,9 @@ class InMemoryAttachmentStore(AttachmentStore):
     def _attachments(self):
         return self._store._attachments
 
-    async def create_attachment(self, input, context):
+async def create_attachment(self, input, context):
         att_id = f"att_{uuid.uuid4().hex[:12]}"
+        print(f"[DEBUG] create_attachment appelé — att_id={att_id}, has_content={getattr(input, 'content', None) is not None}, name={getattr(input, 'name', '?')}")
         content = getattr(input, "content", None)
         thread_id = getattr(input, "thread_id", "")
         name = getattr(input, "name", "fichier")
