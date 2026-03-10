@@ -2954,104 +2954,132 @@ S
 
 sebus_excel_expert = Agent(
   name="Sebus Excel expert",
-  instructions="""SYSTEM — SEBUS (ULTRA EXPERT EXCEL : FORMULES, DEBUG, MODÉLISATION — SANS UPLOAD .XLSX) — IMPACT³ / SWOTT
+  instructions="""SYSTEM — SEBUS (ULTRA EXPERT EXCEL : FORMULES, DEBUG, MODÉLISATION & GÉNÉRATION) — IMPACT³ / SWOTT
 
 PRÉSENTATION (OBLIGATOIRE) — VOUVOIEMENT PAR DÉFAUT
 Commence CHAQUE réponse par exactement 1 ligne de présentation.
 Par défaut, utilise le vouvoiement.
-N’utilise le tutoiement uniquement si l’utilisateur tutoie clairement (ex. “tu”, “t’es”, “peux-tu”, “stp”, “merci à toi”, etc.).
-Forme à utiliser (vouvoiement — par défaut) : Bonjour, je suis <PRÉNOM>. Je suis là pour vous aider à <MISSION>.
-Forme à utiliser (tutoiement — seulement si l’utilisateur tutoie) : Bonjour, je suis <PRÉNOM>. Je suis là pour t’aider à <MISSION>.
+N'utilise le tutoiement UNIQUEMENT si l'utilisateur tutoie clairement (ex. \"tu\", \"t'es\", \"peux-tu\", \"stp\").
+Forme vouvoiement : Bonjour, je suis Sebus. Je suis là pour vous aider à construire, corriger et optimiser vos fichiers et formules Excel.
+Forme tutoiement : Bonjour, je suis Sebus. Je suis là pour t'aider à construire, corriger et optimiser tes fichiers et formules Excel.
 Puis saute une ligne et continue directement avec la réponse.
 Ne répète pas cette présentation ailleurs dans le message.
-Interdiction de faire des remplacements mot-à-mot (“vous”→“te”). Utilise la phrase complète correspondante.
 
 STYLE
 - Présentation = 1 seule phrase, courte, pas de blabla.
 - Ensuite : réponses structurées, concrètes, orientées action.
-
+- Utilise une mise en forme Markdown légère (titres ##, listes à puces, **gras**) pour structurer tes réponses.
 
 RÔLE & POSTURE
 Je suis Sebus, spécialiste senior Excel et modélisation (niveau expert).
-Ma mission : aider l’utilisateur à construire, corriger et optimiser des formules Excel, diagnostiquer des erreurs (#N/A, #VALEUR!, #REF!, #NOM?, #DIV/0!, dates/texte), structurer des modèles robustes, et accélérer le travail sur Excel.
+Ma mission : aider l'utilisateur à construire, corriger et optimiser des formules Excel, diagnostiquer des erreurs, structurer des modèles robustes, générer des fichiers Excel prêts à l'emploi, et accélérer le travail sur Excel.
 
-IMPORTANT — CONTRAINTE OUTIL
-Les fichiers Excel (.xlsx/.xls) NE SONT PAS uploadables ici.
-Je travaille donc uniquement à partir de :
-- captures d’écran (tableau + en-têtes + cellules/formules/erreurs visibles)
-- PDF (export Excel ou impression PDF)
+FICHIERS ACCEPTÉS
+L'utilisateur peut uploader des fichiers PDF, Word, Excel (.xlsx) et TXT directement dans le chat.
+Le contenu est extrait automatiquement et transmis entre les balises ---DOCUMENTS FOURNIS PAR L'UTILISATEUR---.
+Quand un fichier est fourni, je l'utilise comme source de données : j'en extrais les tableaux, en-têtes, formules visibles, et toute information utile pour répondre.
+
+Je peux aussi travailler à partir de :
+- captures d'écran (tableau + en-têtes + cellules/formules/erreurs visibles)
 - texte copié-collé (formules, extraits de données, en-têtes)
-Je n’attends jamais un fichier Excel.
+
+En plus de l'analyse, JE PEUX GÉNÉRER des fichiers Excel téléchargeables (voir section GÉNÉRATION DE FICHIERS EXCEL en bas).
 
 PÉRIMÈTRE
 ✅ Formules (FR/EN) : SI, ET/OU, SI.CONDITIONS, RECHERCHEX/XLOOKUP, INDEX/EQUIV, SOMME.SI.ENS, NB.SI.ENS, FILTRE, UNIQUE, TRIER, LET, TEXTJOIN, GAUCHE/DROITE/STXT, TEXTE, DATE, MOIS, ANNEE, ARRONDI, etc.
 ✅ Tableaux structurés (Ctrl+T), validation de données, mise en forme conditionnelle, bonnes pratiques.
 ✅ Debug : isoler la cause, proposer correction + tests.
 ✅ Optimisation : performance, lisibilité, maintenabilité (LET, simplification, réduction des volatiles).
+✅ Génération de fichiers Excel prêts à l'emploi (templates, grilles, modèles).
 
 ❌ Hors périmètre : stratégie de négociation, avis juridique. VBA/macros seulement si explicitement demandé.
 
 PRINCIPES NON NÉGOCIABLES
-1) Zéro hallucination : je n’invente pas la structure ; si une info manque, je pose la question.
-2) Reproductibilité : chaque formule proposée est testable et accompagnée d’exemples.
+1) Zéro hallucination : je n'invente pas la structure ; si une info manque, je pose la question.
+2) Reproductibilité : chaque formule proposée est testable et accompagnée d'exemples.
 3) Robustesse : gestion erreurs, données manquantes, types, doublons.
-4) Clarté : je fournis une version “simple” puis une version “robuste/optimisée” si utile.
-5) Adaptation FR/EN : si la langue d’Excel est inconnue, je demande ; sinon je fournis FR (et EN si utile).
+4) Clarté : je fournis une version \"simple\" puis une version \"robuste/optimisée\" si utile.
+5) Adaptation FR/EN : si la langue d'Excel est inconnue, je demande ; sinon je fournis FR (et EN si utile).
 
-DÉCLENCHEUR — INFOS MINIMALES À DEMANDER (SANS FICHIER)
-Je demande systématiquement (en une seule fois) :
+DÉCLENCHEUR — INFOS MINIMALES À DEMANDER
+Selon le type de demande :
 
-A) Version d’Excel (365 / 2021 / 2019) et langue (FR/EN) + séparateur (virgule ou point-virgule si connu)
-B) Objectif précis : “quel résultat attendu dans quelle cellule ?”
-C) Source des données : capture/PDF avec en-têtes + 5–10 lignes visibles (ou copier-coller d’un extrait)
-D) Formule actuelle (si elle existe) + message d’erreur EXACT affiché par Excel
-E) Contraintes : multi-critères ? doublons ? cellules vides ? performance ? plage extensible ?
+Pour du debug/formule, je demande (en une seule fois) :
+A) Version d'Excel (365 / 2021 / 2019) et langue (FR/EN)
+B) Objectif précis : \"quel résultat attendu dans quelle cellule ?\"
+C) Source des données : capture/PDF avec en-têtes + 5–10 lignes visibles
+D) Formule actuelle (si elle existe) + message d'erreur EXACT
+E) Contraintes : multi-critères ? doublons ? cellules vides ?
 
-Si l’utilisateur ne peut pas donner 5–10 lignes : je demande 2–3 exemples “entrée → résultat attendu”.
+Pour de la génération de fichier, je demande :
+A) Le type de fichier souhaité (template, grille, modèle de calcul)
+B) Les colonnes / en-têtes souhaitées
+C) Le contexte (famille Achats, période, usage)
 
 MÉTHODE DE RÉSOLUTION (EN ÉTAPES)
 Étape 1 — Reformulation du besoin
-- Je reformule en termes Excel : colonnes, critères, résultat, niveau de granularité (par ligne, par mois, etc.).
+- Je reformule en termes Excel : colonnes, critères, résultat, granularité.
 
-Étape 2 — Diagnostic
+Étape 2 — Diagnostic (si debug)
 - Types (texte/nombre/date), espaces invisibles, formats, ancrages $, plages, valeurs manquantes, doublons.
-- Je pointe la cause probable de l’erreur et comment la vérifier.
+- Je pointe la cause probable de l'erreur et comment la vérifier.
 
-Étape 3 — Formule(s) proposée(s)
-Je fournis :
-- une formule “simple”
-- une formule “robuste” (SIERREUR/IFERROR, gestion blancs, LET si utile)
+Étape 3 — Formule(s) ou fichier proposé(s)
+Pour les formules :
+- une formule \"simple\"
+- une formule \"robuste\" (SIERREUR/IFERROR, gestion blancs, LET si utile)
 - si besoin : alternative sans nouvelle fonction (si Excel ancien)
+
+Pour les fichiers : j'utilise le format [FILE:EXCEL] (voir section dédiée).
 
 Étape 4 — Tests
 - 2–3 tests (cas nominal + cas limite)
 - Je demande validation des résultats.
 
-BIBLIOTHÈQUE D’ERREURS (OBLIGATOIRE)
-Si l’utilisateur mentionne une erreur, je fournis immédiatement :
-- cause probable
-- test de vérification
-- correction
+BIBLIOTHÈQUE D'ERREURS (OBLIGATOIRE)
+Si l'utilisateur mentionne une erreur, je fournis immédiatement :
+- cause probable + test de vérification + correction
 
-Exemples :
-- #N/A : recherche introuvable / types différents / espaces → vérifier avec SUPPRESPACE/TRIM + TYPE
-- #VALEUR! : mélange texte/nombre/date → vérifier VALEUR/NOMBRE/TEXTE
-- #NOM? : fonction non reconnue / langue / séparateur → vérifier version + séparateur
-- #REF! : plage/cellule supprimée → vérifier références
-- #DIV/0! : division par 0/blanc → sécuriser avec SI/IF et SIERREUR
+Rappels :
+- #N/A : recherche introuvable / types différents / espaces
+- #VALEUR! : mélange texte/nombre/date
+- #NOM? : fonction non reconnue / langue / séparateur
+- #REF! : plage/cellule supprimée
+- #DIV/0! : division par 0/blanc
 
 FORMAT DE SORTIE
 Je structure chaque réponse en 4 sections courtes :
 1) Ce que je comprends
-2) Ce qu’il me manque (si nécessaire)
-3) Formule(s) proposée(s) + explication
+2) Ce qu'il me manque (si nécessaire)
+3) Formule(s) proposée(s) + explication (ou fichier généré)
 4) Tests + question suivante
 
-MESSAGE D’INTRODUCTION (SYSTÉMATIQUE)
+INTRODUCTION SYSTÉMATIQUE
 Bonjour, je suis Sebus, votre expert Excel.
-Les fichiers Excel ne sont pas uploadables ici : envoyez une capture d’écran ou un PDF (avec en-têtes et quelques lignes), ou copiez-collez la formule et 5–10 lignes.
-Pouvez-vous préciser : votre version d’Excel et langue (FR/EN), l’objectif exact, la formule actuelle (si existante) et l’erreur affichée ?
-""",
+Vous pouvez m'envoyer un fichier (Excel, PDF, capture), copier-coller une formule, ou décrire votre besoin.
+Je peux aussi vous générer des fichiers Excel prêts à l'emploi (templates, grilles, modèles).
+Quel est votre besoin ?
+
+## GÉNÉRATION DE FICHIERS EXCEL
+
+Quand l'utilisateur demande de générer, créer ou envoyer un fichier Excel (template, grille, modèle, export), je DOIS retourner les données dans un bloc marqueur spécial.
+JE NE RETOURNE JAMAIS de lien sandbox:/ ni de fichier via Code Interpreter. J'utilise UNIQUEMENT ce format :
+
+[FILE:EXCEL]
+{\"filename\": \"nom_du_fichier.xlsx\", \"sheets\": [{\"name\": \"Feuille1\", \"headers\": [\"Colonne1\", \"Colonne2\"], \"rows\": [[\"valeur1\", \"valeur2\"]]}]}
+[/FILE]
+
+Règles :
+1. Le JSON doit être valide (pas de virgules trailing, pas de commentaires).
+2. filename : nom descriptif du fichier.
+3. sheets : je peux créer plusieurs feuilles si nécessaire.
+4. headers : les en-têtes de colonnes.
+5. rows : les lignes de données. Chaque ligne est un tableau de valeurs.
+6. Les valeurs numériques doivent être des nombres, pas des strings.
+7. Les cellules vides sont des strings vides : \"\".
+8. AVANT le bloc [FILE:EXCEL], je peux écrire un court message (2-3 phrases max).
+9. APRÈS le bloc [FILE:EXCEL], je peux ajouter des conseils d'utilisation.
+10. Je ne répète JAMAIS les données du fichier en texte ou markdown. Le fichier suffit.""",
   model="gpt-5.2",
   tools=[
     code_interpreter
@@ -4056,752 +4084,3 @@ Ensuite vous proposez : “Je peux vous produire une V1 maintenant (avec hypoth�
     )
   )
 )
-
-
-class WorkflowInput(BaseModel):
-  input_as_text: str
-
-
-# Main code entrypoint
-async def run_workflow(workflow_input: WorkflowInput):
-  with trace("Impact3_CorteX"):
-    state = {
-
-    }
-    workflow = workflow_input.model_dump()
-    conversation_history: list[TResponseInputItem] = [
-      {
-        "role": "user",
-        "content": [
-          {
-            "type": "input_text",
-            "text": workflow["input_as_text"]
-          }
-        ]
-      }
-    ]
-    agent_ifelse_json_result_temp = await Runner.run(
-      agent_ifelse_json,
-      input=[
-        *conversation_history
-      ],
-      run_config=RunConfig(trace_metadata={
-        "__trace_source__": "agent-builder",
-        "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-      })
-    )
-    agent_ifelse_json_result = {
-      "output_text": agent_ifelse_json_result_temp.final_output.json(),
-      "output_parsed": agent_ifelse_json_result_temp.final_output.model_dump()
-    }
-    if agent_ifelse_json_result["output_parsed"]["category"] == "WAIT_CONFIRMATION":
-      cortex_routage_result_temp = await Runner.run(
-        cortex_routage,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in cortex_routage_result_temp.new_items])
-
-      cortex_routage_result = {
-        "output_text": cortex_routage_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "":
-      cortex_routage_result_temp = await Runner.run(
-        cortex_routage,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in cortex_routage_result_temp.new_items])
-
-      cortex_routage_result = {
-        "output_text": cortex_routage_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "DIAGNOSTIC_ORGANISATIONNEL":
-      leonard_diag_orga_result_temp = await Runner.run(
-        leonard_diag_orga,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in leonard_diag_orga_result_temp.new_items])
-
-      leonard_diag_orga_result = {
-        "output_text": leonard_diag_orga_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "STRATEGIE_PORTEFEUILLE":
-      jacques_strat_gie_portefeuilles_result_temp = await Runner.run(
-        jacques_strat_gie_portefeuilles,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in jacques_strat_gie_portefeuilles_result_temp.new_items])
-
-      jacques_strat_gie_portefeuilles_result = {
-        "output_text": jacques_strat_gie_portefeuilles_result_temp.final_output.json(),
-        "output_parsed": jacques_strat_gie_portefeuilles_result_temp.final_output.model_dump()
-      }
-      if jacques_strat_gie_portefeuilles_result["output_parsed"]["smr_axis"] == "":
-        jacques_ia_result_temp = await Runner.run(
-          jacques_ia,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-
-        conversation_history.extend([item.to_input_item() for item in jacques_ia_result_temp.new_items])
-
-        jacques_ia_result = {
-          "output_text": jacques_ia_result_temp.final_output_as(str)
-        }
-      elif jacques_strat_gie_portefeuilles_result["output_parsed"]["smr_axis"] == "SMR_E":
-        eustache_ia_result_temp = await Runner.run(
-          eustache_ia,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-
-        conversation_history.extend([item.to_input_item() for item in eustache_ia_result_temp.new_items])
-
-        eustache_ia_result = {
-          "output_text": eustache_ia_result_temp.final_output_as(str)
-        }
-      elif jacques_strat_gie_portefeuilles_result["output_parsed"]["smr_axis"] == "SMR_R":
-        marguerite_ia_result_temp = await Runner.run(
-          marguerite_ia,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-
-        conversation_history.extend([item.to_input_item() for item in marguerite_ia_result_temp.new_items])
-
-        marguerite_ia_result = {
-          "output_text": marguerite_ia_result_temp.final_output_as(str)
-        }
-      elif jacques_strat_gie_portefeuilles_result["output_parsed"]["smr_axis"] == "SMR_CSR":
-        luther_ia_result_temp = await Runner.run(
-          luther_ia,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-
-        conversation_history.extend([item.to_input_item() for item in luther_ia_result_temp.new_items])
-
-        luther_ia_result = {
-          "output_text": luther_ia_result_temp.final_output_as(str)
-        }
-      elif jacques_strat_gie_portefeuilles_result["output_parsed"]["smr_axis"] == "SMR_SH":
-        chan_ia_result_temp = await Runner.run(
-          chan_ia,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-
-        conversation_history.extend([item.to_input_item() for item in chan_ia_result_temp.new_items])
-
-        chan_ia_result = {
-          "output_text": chan_ia_result_temp.final_output_as(str)
-        }
-      else:
-        jacques_ia_result_temp = await Runner.run(
-          jacques_ia,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-
-        conversation_history.extend([item.to_input_item() for item in jacques_ia_result_temp.new_items])
-
-        jacques_ia_result = {
-          "output_text": jacques_ia_result_temp.final_output_as(str)
-        }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "PLAN_ACTION_OEP":
-      isaac_plan_d_action_orga_result_temp = await Runner.run(
-        isaac_plan_d_action_orga,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in isaac_plan_d_action_orga_result_temp.new_items])
-
-      isaac_plan_d_action_orga_result = {
-        "output_text": isaac_plan_d_action_orga_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "LEVIERS_OPTIMISATION_PROJET":
-      henry_leviers_achats_result_temp = await Runner.run(
-        henry_leviers_achats,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in henry_leviers_achats_result_temp.new_items])
-
-      henry_leviers_achats_result = {
-        "output_text": henry_leviers_achats_result_temp.final_output.json(),
-        "output_parsed": henry_leviers_achats_result_temp.final_output.model_dump()
-      }
-      if henry_leviers_achats_result["output_parsed"]["sml_axis"] == "":
-        henry_ia_result_temp = await Runner.run(
-          henry_ia,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-
-        conversation_history.extend([item.to_input_item() for item in henry_ia_result_temp.new_items])
-
-        henry_ia_result = {
-          "output_text": henry_ia_result_temp.final_output_as(str)
-        }
-      elif henry_leviers_achats_result["output_parsed"]["sml_axis"] == "SML_E":
-        mich_le_ia_result_temp = await Runner.run(
-          mich_le_ia,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-
-        conversation_history.extend([item.to_input_item() for item in mich_le_ia_result_temp.new_items])
-
-        mich_le_ia_result = {
-          "output_text": mich_le_ia_result_temp.final_output_as(str)
-        }
-      elif henry_leviers_achats_result["output_parsed"]["sml_axis"] == "SML_R":
-        albert_ia_result_temp = await Runner.run(
-          albert_ia,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-
-        conversation_history.extend([item.to_input_item() for item in albert_ia_result_temp.new_items])
-
-        albert_ia_result = {
-          "output_text": albert_ia_result_temp.final_output_as(str)
-        }
-      elif henry_leviers_achats_result["output_parsed"]["sml_axis"] == "SML_CSR":
-        savannah_ia_result_temp = await Runner.run(
-          savannah_ia,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-
-        conversation_history.extend([item.to_input_item() for item in savannah_ia_result_temp.new_items])
-
-        savannah_ia_result = {
-          "output_text": savannah_ia_result_temp.final_output_as(str)
-        }
-      elif henry_leviers_achats_result["output_parsed"]["sml_axis"] == "SML_SH":
-        catherine_ia_result_temp = await Runner.run(
-          catherine_ia,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-
-        conversation_history.extend([item.to_input_item() for item in catherine_ia_result_temp.new_items])
-
-        catherine_ia_result = {
-          "output_text": catherine_ia_result_temp.final_output_as(str)
-        }
-      else:
-        henry_ia_result_temp = await Runner.run(
-          henry_ia,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-
-        conversation_history.extend([item.to_input_item() for item in henry_ia_result_temp.new_items])
-
-        henry_ia_result = {
-          "output_text": henry_ia_result_temp.final_output_as(str)
-        }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "ANALYSE_DONNEES":
-      gustave_data_expert_result_temp = await Runner.run(
-        gustave_data_expert,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in gustave_data_expert_result_temp.new_items])
-
-      gustave_data_expert_result = {
-        "output_text": gustave_data_expert_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "DECOMPOSITION_COUTS":
-      achille_tco_decompo_result_temp = await Runner.run(
-        achille_tco_decompo,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in achille_tco_decompo_result_temp.new_items])
-
-      achille_tco_decompo_result = {
-        "output_text": achille_tco_decompo_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "JURIDIQUE_CONTRATS":
-      hypathie_juriste_contrats_result_temp = await Runner.run(
-        hypathie_juriste_contrats,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in hypathie_juriste_contrats_result_temp.new_items])
-
-      hypathie_juriste_contrats_result = {
-        "output_text": hypathie_juriste_contrats_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "SOURCING_MARCHE_FOURNISSEUR":
-      sherlock_sourcing_cadrage_result_temp = await Runner.run(
-        sherlock_sourcing_cadrage,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in sherlock_sourcing_cadrage_result_temp.new_items])
-
-      sherlock_sourcing_cadrage_result = {
-        "output_text": sherlock_sourcing_cadrage_result_temp.final_output_as(str)
-      }
-      sherlock_fast_json_ai_result_temp = await Runner.run(
-        sherlock_fast_json_ai,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-      sherlock_fast_json_ai_result = {
-        "output_text": sherlock_fast_json_ai_result_temp.final_output.json(),
-        "output_parsed": sherlock_fast_json_ai_result_temp.final_output.model_dump()
-      }
-      if sherlock_fast_json_ai_result["output_parsed"]["launch_deep"] == True:
-        sherlock_deep_result_temp = await Runner.run(
-          sherlock_deep,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-        sherlock_deep_result = {
-          "output_text": sherlock_deep_result_temp.final_output_as(str)
-        }
-      else:
-        return sherlock_fast_json_ai_result
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "COMPARAISON_OFFRES":
-      hercule_comparaison_d_offres_result_temp = await Runner.run(
-        hercule_comparaison_d_offres,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in hercule_comparaison_d_offres_result_temp.new_items])
-
-      hercule_comparaison_d_offres_result = {
-        "output_text": hercule_comparaison_d_offres_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "REDACTION_AO":
-      clint_ai_result_temp = await Runner.run(
-        clint_ai,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in clint_ai_result_temp.new_items])
-
-      clint_ai_result = {
-        "output_text": clint_ai_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "MATURITE_ACHATS":
-      barack_ai_result_temp = await Runner.run(
-        barack_ai,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in barack_ai_result_temp.new_items])
-
-      barack_ai_result = {
-        "output_text": barack_ai_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "CORTEX_CORE":
-      cortex_core_result_temp = await Runner.run(
-        cortex_core,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in cortex_core_result_temp.new_items])
-
-      cortex_core_result = {
-        "output_text": cortex_core_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "POLITIQUE_ACHATS":
-      marcel_politique_achats_result_temp = await Runner.run(
-        marcel_politique_achats,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in marcel_politique_achats_result_temp.new_items])
-
-      marcel_politique_achats_result = {
-        "output_text": marcel_politique_achats_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "PREPARATION_NEGOCIATION":
-      hector_n_gociation_result_temp = await Runner.run(
-        hector_n_gociation,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in hector_n_gociation_result_temp.new_items])
-
-      hector_n_gociation_result = {
-        "output_text": hector_n_gociation_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "EMAILS_COMMUNICATION":
-      mazarin_diplomate_result_temp = await Runner.run(
-        mazarin_diplomate,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in mazarin_diplomate_result_temp.new_items])
-
-      mazarin_diplomate_result = {
-        "output_text": mazarin_diplomate_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "SEBUS_EXCEL":
-      sebus_excel_expert_result_temp = await Runner.run(
-        sebus_excel_expert,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in sebus_excel_expert_result_temp.new_items])
-
-      sebus_excel_expert_result = {
-        "output_text": sebus_excel_expert_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "COMPTE_RENDU_CR":
-      franklin_cr_result_temp = await Runner.run(
-        franklin_cr,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in franklin_cr_result_temp.new_items])
-
-      franklin_cr_result = {
-        "output_text": franklin_cr_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "CAHIER_DES_CHARGES":
-      augustine_cdc_result_temp = await Runner.run(
-        augustine_cdc,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in augustine_cdc_result_temp.new_items])
-
-      augustine_cdc_result = {
-        "output_text": augustine_cdc_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "BENCHMARK_CONCURRENTIEL":
-      freya_benchmark_cadrage_result_temp = await Runner.run(
-        freya_benchmark_cadrage,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in freya_benchmark_cadrage_result_temp.new_items])
-
-      freya_benchmark_cadrage_result = {
-        "output_text": freya_benchmark_cadrage_result_temp.final_output_as(str)
-      }
-      freya_json_result_temp = await Runner.run(
-        freya_json,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-      freya_json_result = {
-        "output_text": freya_json_result_temp.final_output.json(),
-        "output_parsed": freya_json_result_temp.final_output.model_dump()
-      }
-      if freya_json_result["output_parsed"]["launch_deep"] == True:
-        freya_deep_result_temp = await Runner.run(
-          freya_deep,
-          input=[
-            *conversation_history
-          ],
-          run_config=RunConfig(trace_metadata={
-            "__trace_source__": "agent-builder",
-            "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-          })
-        )
-
-        conversation_history.extend([item.to_input_item() for item in freya_deep_result_temp.new_items])
-
-        freya_deep_result = {
-          "output_text": freya_deep_result_temp.final_output_as(str)
-        }
-      else:
-        return freya_json_result
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "RFAR_LABEL_DIAGNOSTIC":
-      hilda_rfar_result_temp = await Runner.run(
-        hilda_rfar,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in hilda_rfar_result_temp.new_items])
-
-      hilda_rfar_result = {
-        "output_text": hilda_rfar_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "MESURE_IMPACT_CARBONE":
-      hermes_bilan_carbone_result_temp = await Runner.run(
-        hermes_bilan_carbone,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in hermes_bilan_carbone_result_temp.new_items])
-
-      hermes_bilan_carbone_result = {
-        "output_text": hermes_bilan_carbone_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "REDACTION_PROCESSUS_ACHATS":
-      iris_processus_achats_result_temp = await Runner.run(
-        iris_processus_achats,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in iris_processus_achats_result_temp.new_items])
-
-      iris_processus_achats_result = {
-        "output_text": iris_processus_achats_result_temp.final_output_as(str)
-      }
-    elif agent_ifelse_json_result["output_parsed"]["category"] == "RH_ASSISTANCE":
-      ariane_assistante_rh_result_temp = await Runner.run(
-        ariane_assistante_rh,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in ariane_assistante_rh_result_temp.new_items])
-
-      ariane_assistante_rh_result = {
-        "output_text": ariane_assistante_rh_result_temp.final_output_as(str)
-      }
-    else:
-      cortex_routage_result_temp = await Runner.run(
-        cortex_routage,
-        input=[
-          *conversation_history
-        ],
-        run_config=RunConfig(trace_metadata={
-          "__trace_source__": "agent-builder",
-          "workflow_id": "wf_696b4c50579481908a889f44236f130108bc443970089c82"
-        })
-      )
-
-      conversation_history.extend([item.to_input_item() for item in cortex_routage_result_temp.new_items])
-
-      cortex_routage_result = {
-        "output_text": cortex_routage_result_temp.final_output_as(str)
-      }
