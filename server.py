@@ -1,9 +1,9 @@
 """
-server.py — swott-chatkit
+server.py - swott-chatkit
 Architecture : openai-chatkit + openai-agents SDK (Python natif)
-Persistence : Supabase (PostgreSQL)
+Persistence : Supabase (PostgreSQL + Storage)
 
-Les agents sont définis dans agents_openai.py (copier-coller direct du "Get code" OpenAI).
+Les agents sont definis dans agents_openai.py (copier-coller direct du Get code OpenAI).
 """
 
 import os
@@ -35,7 +35,7 @@ import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-# ── Import des agents depuis le fichier OpenAI (copier-coller direct) ────────
+# -- Import des agents depuis le fichier OpenAI (copier-coller direct) --------
 from agents_openai import (
     agent_ifelse_json as classifier,
     cortex_routage,
@@ -78,7 +78,7 @@ from agents_openai import (
     henry_ia,
 )
 
-# ── Supabase ─────────────────────────────────────────────────────────────────
+# -- Supabase -----------------------------------------------------------------
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
 SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
@@ -86,9 +86,9 @@ supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 WORKFLOW_ID = "wf_696b4c50579481908a889f44236f130108bc443970089c82"
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 # SUPABASE PERSISTENCE
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 
 def db_save_thread(thread_id: str, user_id: str, client_name: str = ""):
     try:
@@ -99,6 +99,7 @@ def db_save_thread(thread_id: str, user_id: str, client_name: str = ""):
         }).execute()
     except Exception as e:
         print(f"[Supabase] db_save_thread error: {e}")
+
 
 def db_append_message(thread_id: str, role: str, content: str, tokens_used: int = 0):
     try:
@@ -113,6 +114,7 @@ def db_append_message(thread_id: str, role: str, content: str, tokens_used: int 
     except Exception as e:
         print(f"[Supabase] db_append_message error: {e}")
 
+
 def db_get_history(thread_id: str) -> list:
     try:
         res = supabase.table("messages") \
@@ -125,6 +127,7 @@ def db_get_history(thread_id: str) -> list:
         print(f"[Supabase] db_get_history error: {e}")
         return []
 
+
 def db_upload_file(thread_id: str, att_id: str, filename: str, raw_bytes: bytes, mime_type: str) -> str:
     """Upload un fichier dans Supabase Storage (bucket 'attachments').
     Retourne le storage_path ou '' en cas d'erreur."""
@@ -135,7 +138,7 @@ def db_upload_file(thread_id: str, att_id: str, filename: str, raw_bytes: bytes,
             file=raw_bytes,
             file_options={"content-type": mime_type}
         )
-        print(f"[Storage] Fichier uploadé: {storage_path}")
+        print(f"[Storage] Fichier uploade: {storage_path}")
         return storage_path
     except Exception as e:
         print(f"[Storage] Erreur upload: {e}")
@@ -171,15 +174,16 @@ def db_get_threads_for_user(user_id: str) -> list:
         return []
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 # WORKFLOW
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 
 def _run_config():
     return RunConfig(trace_metadata={
         "__trace_source__": "swott-chatkit-python",
         "workflow_id": WORKFLOW_ID
     })
+
 
 async def run_workflow(history: list) -> str:
 
@@ -263,9 +267,9 @@ async def run_workflow(history: list) -> str:
             return r.final_output_as(str)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# EXTRACTION DE TEXTE (fichiers uploadés par l'utilisateur)
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
+# EXTRACTION DE TEXTE (fichiers uploades par l'utilisateur)
+# =============================================================================
 
 def extract_text(filename: str, content_bytes: bytes) -> str:
     ext = filename.lower().rsplit(".", 1)[-1]
@@ -291,14 +295,14 @@ def extract_text(filename: str, content_bytes: bytes) -> str:
         elif ext == "txt":
             return content_bytes.decode("utf-8", errors="ignore")
         else:
-            return f"[Fichier: {filename} — format non supporté]"
+            return f"[Fichier: {filename} - format non supporte]"
     except Exception as e:
         return f"[Erreur extraction {filename}: {e}]"
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# GÉNÉRATION DE FICHIERS (Excel depuis marqueurs agents)
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
+# GENERATION DE FICHIERS (Excel depuis marqueurs agents)
+# =============================================================================
 
 def extract_file_markers(text: str) -> tuple:
     pattern = r'\[FILE:EXCEL\]\s*(.*?)\s*\[/FILE\]'
@@ -310,9 +314,9 @@ def extract_file_markers(text: str) -> tuple:
             filename = data.get("filename", "export.xlsx")
             b64 = generate_xlsx_b64(data)
             files.append({"type": "excel", "filename": filename, "b64": b64})
-            print(f"[FILE] Excel généré: {filename}")
+            print(f"[FILE] Excel genere: {filename}")
         except Exception as e:
-            print(f"[FILE] Erreur génération Excel: {e}")
+            print(f"[FILE] Erreur generation Excel: {e}")
     clean_text = re.sub(pattern, '', text, flags=re.DOTALL).strip()
     return clean_text, files
 
@@ -329,7 +333,7 @@ def generate_xlsx_b64(data: dict) -> str:
     )
     sheets = data.get("sheets", [])
     if not sheets:
-        sheets = [{"name": "Données", "headers": data.get("headers", []), "rows": data.get("rows", [])}]
+        sheets = [{"name": "Donnees", "headers": data.get("headers", []), "rows": data.get("rows", [])}]
     for sheet_data in sheets:
         name = sheet_data.get("name", "Feuille")[:31]
         ws = wb.create_sheet(title=name)
@@ -357,9 +361,9 @@ def generate_xlsx_b64(data: dict) -> str:
     return base64.b64encode(buffer.read()).decode("utf-8")
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 # IN-MEMORY STORES (ChatKit)
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 
 class InMemoryStore(Store):
     def __init__(self):
@@ -432,7 +436,7 @@ class InMemoryAttachmentStore(AttachmentStore):
     def _attachments(self):
         return self._store._attachments
 
-async def create_attachment(self, input, context):
+    async def create_attachment(self, input, context):
         att_id = f"att_{uuid.uuid4().hex[:12]}"
         print(f"[DEBUG] create_attachment - att_id={att_id}, has_content={getattr(input, 'content', None) is not None}, name={getattr(input, 'name', '?')}")
         content = getattr(input, "content", None)
@@ -443,8 +447,8 @@ async def create_attachment(self, input, context):
             raw = base64.b64decode(content) if isinstance(content, str) else content
             self._bytes[att_id] = raw
             self._texts[att_id] = extract_text(name, raw)
-            print(f">>> Fichier reçu: {name} ({len(raw)} bytes)")
-            # Upload dans Supabase Storage (bucket privé 'attachments')
+            print(f">>> Fichier recu: {name} ({len(raw)} bytes)")
+            # Upload dans Supabase Storage (bucket prive 'attachments')
             db_upload_file(thread_id, att_id, name, raw, mime_type)
         att = FileAttachment(
             id=att_id,
@@ -469,9 +473,9 @@ async def create_attachment(self, input, context):
         return self._attachments.get(att_id)
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 # CHATKIT SERVER
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 
 class SwottChatKitServer(ChatKitServer):
     def __init__(self, data_store, attachment_store):
@@ -518,28 +522,28 @@ class SwottChatKitServer(ChatKitServer):
 
         print(f">>> [{thread.id}] user_id={user_id} msg={message_text[:80]}")
 
-        # ── Appel workflow ──
+        # -- Appel workflow --
         response_text = await run_workflow(history)
         response_text = re.sub(r'filecite\S+', '', response_text).strip()
 
-        # ── Détecter et générer les fichiers ──
+        # -- Detecter et generer les fichiers --
         response_text, generated_files = extract_file_markers(response_text)
 
         if generated_files:
-            print(f"[FILE] {len(generated_files)} fichier(s) détecté(s) et généré(s)")
+            print(f"[FILE] {len(generated_files)} fichier(s) detecte(s) et genere(s)")
 
-        # ── Persister dans Supabase (sans le base64) ──
+        # -- Persister dans Supabase (sans le base64) --
         text_for_db = response_text
         if generated_files:
             filenames = ", ".join(f["filename"] for f in generated_files)
-            text_for_db += f"\n\n📎 Fichier(s) généré(s) : {filenames}"
+            text_for_db += f"\n\nFichier(s) genere(s) : {filenames}"
         tokens = len((message_text or " ").split()) + len(text_for_db.split())
         db_append_message(thread.id, "user", message_text or " ")
         db_append_message(thread.id, "assistant", text_for_db, tokens_used=tokens)
 
-        print(f">>> Réponse: {response_text[:80]}")
+        print(f">>> Reponse: {response_text[:80]}")
 
-        # ── Stream la réponse texte ──
+        # -- Stream la reponse texte --
         item_id = f"msg_{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc)
 
@@ -555,7 +559,7 @@ class SwottChatKitServer(ChatKitServer):
             yield AssistantMessageContentPartTextDelta(content_index=0, delta=txt)
             await asyncio.sleep(0.02)
 
-        # ── Stream les fichiers générés ──
+        # -- Stream les fichiers generes --
         for f in generated_files:
             file_html = (
                 f'\n\n<!--SWOTT_FILE:{json.dumps({"filename": f["filename"], "type": f["type"], "b64": f["b64"]})}-->'
@@ -577,9 +581,9 @@ class SwottChatKitServer(ChatKitServer):
         ))
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 # FASTAPI
-# ═══════════════════════════════════════════════════════════════════════════════
+# =============================================================================
 
 app = FastAPI()
 app.add_middleware(
@@ -591,16 +595,16 @@ app.add_middleware(
 )
 
 data_store = InMemoryStore()
-att_store  = InMemoryAttachmentStore(data_store)
-server     = SwottChatKitServer(data_store, att_store)
+att_store = InMemoryAttachmentStore(data_store)
+server = SwottChatKitServer(data_store, att_store)
 
 
 @app.post("/chatkit")
 async def chatkit_endpoint(request: Request):
-    body    = await request.body()
+    body = await request.body()
     user_id = request.headers.get("x-user-id") or request.query_params.get("user_id", "anon")
     client_name = request.headers.get("x-client-name") or request.query_params.get("client_name", "")
-    result  = await server.process(body, {"user_id": user_id, "client_name": client_name})
+    result = await server.process(body, {"user_id": user_id, "client_name": client_name})
     if isinstance(result, StreamingResult):
         return StreamingResponse(result, media_type="text/event-stream")
     return Response(content=result.json, media_type="application/json")
@@ -620,19 +624,19 @@ async def get_threads(user_id: str = "anon"):
 
 @app.get("/download")
 async def download_file(path: str):
-    """Génère une URL signée temporaire (1h) pour télécharger un fichier depuis Supabase Storage."""
+    """Genere une URL signee temporaire (1h) pour telecharger un fichier depuis Supabase Storage."""
     try:
         result = supabase.storage.from_("attachments").create_signed_url(path, 3600)
         if result and result.get("signedURL"):
             return {"url": result["signedURL"]}
-        return {"error": "Fichier non trouvé"}
+        return {"error": "Fichier non trouve"}
     except Exception as e:
         return {"error": str(e)}
 
 
 @app.get("/files/{thread_id}")
 async def list_files(thread_id: str):
-    """Liste les fichiers uploadés dans un thread."""
+    """Liste les fichiers uploades dans un thread."""
     try:
         files = supabase.storage.from_("attachments").list(thread_id)
         return {"thread_id": thread_id, "files": [
@@ -674,13 +678,14 @@ async def get_stats(user_id: str = None):
             stats[key]["total_tokens"] += sum(m["tokens_used"] or 0 for m in msgs.data)
         for r in stats.values():
             if not r["client_name"]:
-                r["client_name"] = "—"
+                r["client_name"] = "-"
         result = list(stats.values())
         if user_id:
             result = [r for r in result if r["user_id"] == user_id]
         return {"stats": sorted(result, key=lambda x: x["total_tokens"], reverse=True)}
     except Exception as e:
         return {"error": str(e)}
+
 
 @app.get("/test-storage")
 async def test_storage():
@@ -694,6 +699,7 @@ async def test_storage():
         return {"status": "ok", "result": str(result)}
     except Exception as e:
         return {"status": "error", "detail": str(e)}
+
 
 @app.get("/")
 async def healthcheck():
