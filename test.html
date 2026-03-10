@@ -1,16 +1,19 @@
 <!DOCTYPE html>
-<html>
+<html lang="fr">
 <head>
-  <title>SWOTT ChatKit Test</title>
+  <meta charset="UTF-8">
+  <title>SWOTT ChatKit</title>
   <script src="https://cdn.platform.openai.com/deployments/chatkit/chatkit.js"></script>
 </head>
-<body>
-  <openai-chatkit id="my-chat" style="height:600px;width:400px;display:block;"></openai-chatkit>
+<body style="display:flex;justify-content:center;align-items:center;height:100vh;margin:0;background:#f5f5f5;">
+
+  <openai-chatkit id="my-chat" style="height:700px;width:480px;display:block;"></openai-chatkit>
+
   <script>
     const chatkit = document.getElementById('my-chat');
     chatkit.setOptions({
       api: {
-        url: 'https://web-production-d7a5f.up.railway.app/chatkit',
+        url: 'http://localhost:8000/chatkit',
         domainKey: 'swott'
       }
     });

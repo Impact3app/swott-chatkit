@@ -1,0 +1,30 @@
+WORKFLOW DE MISE À JOUR DES AGENTS
+====================================
+
+À chaque modification dans l'Agent Builder OpenAI :
+
+1. Agent Builder → "Get code" → onglet "Agents SDK" → "Python"
+2. Copier TOUT le code
+3. Remplacer le contenu de agents_openai.py par ce code
+4. Appliquer ces 3 corrections (Ctrl+H find & replace) :
+
+   FIX 1 :  temperature=0["1"]    →  temperature=0.1
+   FIX 2 :  temperature=0["21"]   →  temperature=0.21
+   FIX 3 :  limit: integer        →  limit: int
+
+5. Supprimer tout à partir de "class WorkflowInput" jusqu'à la fin du fichier
+   (le workflow est dans server.py, pas besoin du doublon)
+
+6. Sauvegarder puis :
+   git add agents_openai.py
+   git commit -m "sync agents from OpenAI"
+   git push
+
+Railway redéploie automatiquement.
+
+FICHIERS DU PROJET
+==================
+agents_openai.py  ← copier-coller OpenAI (source de vérité)
+server.py         ← importe les agents depuis agents_openai.py
+chat.html         ← interface Bubble
+prompts.py        ← À SUPPRIMER (plus utilisé)

@@ -2,12 +2,17 @@
 server.py — swott-chatkit
 Architecture : openai-chatkit + openai-agents SDK (Python natif)
 Persistence : Supabase (PostgreSQL)
+
+Les agents sont définis dans agents_openai.py (copier-coller direct du "Get code" OpenAI).
 """
 
 import os
+import re
+import json
 import uuid
 import base64
 import asyncio
+import io
 from datetime import datetime, timezone
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
@@ -23,12 +28,55 @@ from chatkit.types import (
     ThreadItemAddedEvent, ThreadItemDoneEvent,
     FileAttachment,
 )
-from agents import Agent, ModelSettings, Runner, RunConfig, trace
-from openai.types.shared.reasoning import Reasoning
-from pydantic import BaseModel
+from agents import Runner, RunConfig, trace
 from supabase import create_client, Client
 
-import prompts as P
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+
+# ── Import des agents depuis le fichier OpenAI (copier-coller direct) ────────
+from agents_openai import (
+    agent_ifelse_json as classifier,
+    cortex_routage,
+    marcel_politique_achats as marcel,
+    leonard_diag_orga as leonard,
+    hector_n_gociation as hector,
+    gustave_data_expert as gustave,
+    eustache_ia as eustache,
+    marguerite_ia as marguerite,
+    luther_ia as luther,
+    chan_ia as chan,
+    savannah_ia as savannah,
+    albert_ia as albert,
+    catherine_ia as catherine,
+    mich_le_ia as michele,
+    achille_tco_decompo as achille,
+    hypathie_juriste_contrats as hypathie,
+    sherlock_sourcing_cadrage as sherlock_cadrage,
+    sherlock_fast_json_ai as sherlock_fast,
+    sherlock_deep,
+    hercule_comparaison_d_offres as hercule,
+    clint_ai as clint,
+    barack_ai as barack,
+    isaac_plan_d_action_orga as isaac,
+    mazarin_diplomate as mazarin,
+    sebus_excel_expert as sebus,
+    franklin_cr as franklin,
+    augustine_cdc as augustine,
+    freya_benchmark_cadrage as freya_cadrage,
+    freya_json as freya_fast,
+    freya_deep,
+    hilda_rfar as hilda,
+    hermes_bilan_carbone as hermes,
+    iris_processus_achats as iris,
+    ariane_assistante_rh as ariane,
+    cortex_core,
+    jacques_strat_gie_portefeuilles as jacques_json,
+    henry_leviers_achats as henry_json,
+    jacques_ia,
+    henry_ia,
+)
 
 # ── Supabase ─────────────────────────────────────────────────────────────────
 SUPABASE_URL = os.environ.get("SUPABASE_URL")
@@ -87,7 +135,6 @@ def db_get_threads_for_user(user_id: str) -> list:
             .execute()
         threads = []
         for t in res.data:
-            # Récupérer le dernier message de ce thread
             last = supabase.table("messages") \
                 .select("content") \
                 .eq("thread_id", t["thread_id"]) \
@@ -108,116 +155,6 @@ def db_get_threads_for_user(user_id: str) -> list:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# AGENTS
-# ═══════════════════════════════════════════════════════════════════════════════
-
-class ClassifierSchema(BaseModel):
-    category: str
-    message: str
-
-class JacquesSchema(BaseModel):
-    smr_axis: str
-    message: str
-
-class HenrySchema(BaseModel):
-    sml_axis: str
-    message: str
-
-class SherlockFastSchema(BaseModel):
-    objet: str
-    zone: str
-    contraintes: str
-    urgence: str
-    launch_deep: bool
-    confidence: str
-
-class FreyaFastSchema(BaseModel):
-    company: str
-    solution: str
-    geographies: str
-    objectives_focus: str
-    launch_deep: bool
-    confidence: str
-
-
-def _build_agents():
-    from agents import WebSearchTool, FileSearchTool, CodeInterpreterTool
-    web = WebSearchTool()
-    ci  = CodeInterpreterTool(tool_config={"type": "code_interpreter", "container": {"type": "auto"}})
-
-    def fs(vs_id):
-        return FileSearchTool(vector_store_ids=[vs_id])
-
-    classifier = Agent(
-        name="Agent_IfElse_JSON",
-        instructions=P.AGENT_CLASSIFIER,
-        model="gpt-4.1",
-        output_type=ClassifierSchema,
-        model_settings=ModelSettings(temperature=0.1, max_tokens=300, store=True),
-    )
-
-    cortex_routage = Agent(
-        name="CorteX_Routage",
-        instructions=P.AGENT_CORTEX_ROUTAGE,
-        model="gpt-5-nano",
-        model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="low")),
-    )
-
-    agents = {
-        "cortex_routage": cortex_routage,
-        "classifier":     classifier,
-        "marcel":    Agent(name="Marcel Politique Achats",   instructions=P.AGENT_MARCEL,    model="gpt-5.2", tools=[fs("vs_696b5cbccd5c8191bf05ba182288941f"), web, ci], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "leonard":   Agent(name="Leonard Diag orga",         instructions=P.AGENT_LEONARD,   model="gpt-5.2", tools=[fs("vs_696b5f7c2a1c8191af6d9faf45de8cf5"), web, ci], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "hector":    Agent(name="Hector négociation",        instructions=P.AGENT_HECTOR,    model="gpt-5.2", tools=[web, ci], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "gustave":   Agent(name="Gustave Data expert",       instructions=P.AGENT_GUSTAVE,   model="gpt-5.2", tools=[web, ci], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "eustache":  Agent(name="Eustache.ia",               instructions=P.AGENT_EUSTACHE,  model="gpt-5",   tools=[fs("vs_696b62901dd48191832a5f82c6fca59f"), web], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "marguerite":Agent(name="Marguerite.ia",             instructions=P.AGENT_MARGUERITE,model="gpt-5",   tools=[fs("vs_696b62bf478c8191ac2db36a2167624e"), web], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "luther":    Agent(name="Luther.ia",                 instructions=P.AGENT_LUTHER,    model="gpt-5",   tools=[fs("vs_696b62ea15a881918bdc13cfefc2e3da"), web], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "chan":       Agent(name="Chan.ia",                   instructions=P.AGENT_CHAN,       model="gpt-5",   tools=[fs("vs_696b6377fa4c8191ad34646de598f0ec"), web], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "savannah":  Agent(name="Savannah.ia",               instructions=P.AGENT_SAVANNAH,  model="gpt-5",   model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "albert":    Agent(name="Albert.ia",                 instructions=P.AGENT_ALBERT,    model="gpt-5",   model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "catherine": Agent(name="Catherine.ia",              instructions=P.AGENT_CATHERINE, model="gpt-5",   model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "michele":   Agent(name="Michèle.ia",                instructions=P.AGENT_MICHELE,   model="gpt-5",   tools=[fs("vs_696cb91a5f4881919af132e343839bd3")], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "achille":   Agent(name="Achille TCO",               instructions=P.AGENT_ACHILLE,   model="gpt-5",   tools=[web, ci], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "hypathie":  Agent(name="Hypathie Juriste",          instructions=P.AGENT_HYPATHIE,  model="gpt-5.2-pro", tools=[web], model_settings=ModelSettings(store=True)),
-        "sherlock_cadrage": Agent(name="Sherlock Sourcing Cadrage", instructions=P.AGENT_SHERLOCK_CADRAGE, model="gpt-5.2", model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="low", summary="auto"))),
-        "sherlock_fast":    Agent(name="Sherlock_fast.json.ai",     instructions=P.AGENT_SHERLOCK_FAST_JSON, model="gpt-4.1", output_type=SherlockFastSchema, model_settings=ModelSettings(temperature=0.21, max_tokens=800, store=True)),
-        "sherlock_deep":    Agent(name="Sherlock_Deep",             instructions=P.AGENT_SHERLOCK_DEEP, model="gpt-5.2-pro", tools=[web], model_settings=ModelSettings(store=True, reasoning=Reasoning(summary="auto"))),
-        "hercule":   Agent(name="Hercule comparaison offres",instructions=P.AGENT_HERCULE,   model="gpt-5.2", tools=[web, ci], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="xhigh", summary="auto"))),
-        "clint":     Agent(name="Clint.ai",                  instructions=P.AGENT_CLINT,     model="gpt-5.2", tools=[fs("vs_69737b5136288191b4631b0c59ddfee4"), web, ci], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="high", summary="auto"))),
-        "barack":    Agent(name="Barack.ai",                 instructions=P.AGENT_BARACK,    model="gpt-5.2", tools=[fs("vs_69788788dd048191973251dfa884c9c7")], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="low"))),
-        "isaac":     Agent(name="Isaac plan action",         instructions=P.AGENT_ISAAC,     model="gpt-5.2", tools=[fs("vs_6981b69702e88191acf84e6584eae9e4"), web], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="high", summary="auto"))),
-        "mazarin":   Agent(name="Mazarin Diplomate",         instructions=P.AGENT_MAZARIN,   model="gpt-5.2", model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="low", summary="auto"))),
-        "sebus":     Agent(name="Sebus Excel expert",        instructions=P.AGENT_SEBUS,     model="gpt-5.2", tools=[ci], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="high", summary="auto"))),
-        "franklin":  Agent(name="Franklin CR",               instructions=P.AGENT_FRANKLIN,  model="gpt-5.2", model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium", summary="auto"))),
-        "augustine": Agent(name="Augustine CDC",             instructions=P.AGENT_AUGUSTINE, model="gpt-5.2", tools=[fs("vs_6981fb58587c8191a97c5a9a6df28d08"), web], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="high", summary="auto"))),
-        "freya_cadrage": Agent(name="Freya Benchmark cadrage", instructions=P.AGENT_FREYA_CADRAGE, model="gpt-5.2", tools=[web], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium", summary="auto"))),
-        "freya_fast":    Agent(name="Freya_json",              instructions=P.AGENT_FREYA_FAST_JSON, model="gpt-4.1", output_type=FreyaFastSchema, model_settings=ModelSettings(temperature=1, max_tokens=2048, store=True)),
-        "freya_deep":    Agent(name="Freya Deep",              instructions=P.AGENT_FREYA_DEEP, model="gpt-5.2", tools=[web], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="xhigh", summary="auto"))),
-        "hilda":     Agent(name="Hilda RFAR",                instructions=P.AGENT_HILDA,     model="gpt-5.2", tools=[fs("vs_699710f8b48881918c6f77e0b516c2a7"), web], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="high", summary="auto"))),
-        "hermes":    Agent(name="Hermes Bilan carbone",      instructions=P.AGENT_HERMES,    model="gpt-5.2", tools=[web], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="low", summary="auto"))),
-        "iris":      Agent(name="Iris Processus Achats",     instructions=P.AGENT_IRIS,      model="gpt-5.2", tools=[web], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="high", summary="auto"))),
-        "ariane":    Agent(name="Ariane Assistante RH",      instructions=P.AGENT_ARIANE,    model="gpt-5.2", model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="low", summary="auto"))),
-        "cortex_core": Agent(name="Cortex_core",             instructions=P.AGENT_CORTEX_CORE, model="gpt-5.2", tools=[fs("vs_6981b69702e88191acf84e6584eae9e4"), web], model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="high", summary="auto"))),
-        "jacques_json": Agent(name="Jacques Strat portefeuilles", instructions=P.AGENT_JACQUES_JSON, model="gpt-5.2", output_type=JacquesSchema, model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="low"))),
-        "henry_json":   Agent(name="Henry Leviers Achats",   instructions=P.AGENT_HENRY_JSON, model="gpt-5-nano", output_type=HenrySchema, model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="low"))),
-        "jacques_ia":   Agent(name="Jacques.ia",             instructions=P.AGENT_JACQUES_IA, model="gpt-5",   model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-        "henry_ia":     Agent(name="Henry.ia",               instructions=P.AGENT_HENRY_IA,   model="gpt-5",   model_settings=ModelSettings(store=True, reasoning=Reasoning(effort="medium"))),
-    }
-    return agents
-
-
-# Agents initialisés à la première requête (lazy)
-_AGENTS = None
-
-def get_agents():
-    global _AGENTS
-    if _AGENTS is None:
-        _AGENTS = _build_agents()
-    return _AGENTS
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
 # WORKFLOW
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -228,7 +165,6 @@ def _run_config():
     })
 
 async def run_workflow(history: list) -> str:
-    a = get_agents()
 
     async def _run(agent, h=None):
         inp = list(h) if h is not None else list(history)
@@ -237,96 +173,95 @@ async def run_workflow(history: list) -> str:
 
     with trace("Impact3_CorteX"):
 
-        r_cls = await _run(a["classifier"])
+        r_cls = await _run(classifier)
         parsed = r_cls.final_output
         category = parsed.category if hasattr(parsed, "category") else parsed.get("category", "")
 
         DIRECT = {
-            "": "cortex_routage",
-            "WAIT_CONFIRMATION": "cortex_routage",
-            "DIAGNOSTIC_ORGANISATIONNEL": "leonard",
-            "PLAN_ACTION_OEP": "isaac",
-            "ANALYSE_DONNEES": "gustave",
-            "DECOMPOSITION_COUTS": "achille",
-            "JURIDIQUE_CONTRATS": "hypathie",
-            "COMPARAISON_OFFRES": "hercule",
-            "REDACTION_AO": "clint",
-            "MATURITE_ACHATS": "barack",
-            "CORTEX_CORE": "cortex_core",
-            "POLITIQUE_ACHATS": "marcel",
-            "PREPARATION_NEGOCIATION": "hector",
-            "EMAILS_COMMUNICATION": "mazarin",
-            "SEBUS_EXCEL": "sebus",
-            "COMPTE_RENDU_CR": "franklin",
-            "CAHIER_DES_CHARGES": "augustine",
-            "RFAR_LABEL_DIAGNOSTIC": "hilda",
-            "MESURE_IMPACT_CARBONE": "hermes",
-            "REDACTION_PROCESSUS_ACHATS": "iris",
-            "RH_ASSISTANCE": "ariane",
+            "": cortex_routage,
+            "WAIT_CONFIRMATION": cortex_routage,
+            "DIAGNOSTIC_ORGANISATIONNEL": leonard,
+            "PLAN_ACTION_OEP": isaac,
+            "ANALYSE_DONNEES": gustave,
+            "DECOMPOSITION_COUTS": achille,
+            "JURIDIQUE_CONTRATS": hypathie,
+            "COMPARAISON_OFFRES": hercule,
+            "REDACTION_AO": clint,
+            "MATURITE_ACHATS": barack,
+            "CORTEX_CORE": cortex_core,
+            "POLITIQUE_ACHATS": marcel,
+            "PREPARATION_NEGOCIATION": hector,
+            "EMAILS_COMMUNICATION": mazarin,
+            "SEBUS_EXCEL": sebus,
+            "COMPTE_RENDU_CR": franklin,
+            "CAHIER_DES_CHARGES": augustine,
+            "RFAR_LABEL_DIAGNOSTIC": hilda,
+            "MESURE_IMPACT_CARBONE": hermes,
+            "REDACTION_PROCESSUS_ACHATS": iris,
+            "RH_ASSISTANCE": ariane,
         }
 
         if category in DIRECT:
-            r = await _run(a[DIRECT[category]])
+            r = await _run(DIRECT[category])
             return r.final_output_as(str)
 
         elif category == "STRATEGIE_PORTEFEUILLE":
-            r_j = await _run(a["jacques_json"])
+            r_j = await _run(jacques_json)
             smr_axis = r_j.final_output.smr_axis if hasattr(r_j.final_output, "smr_axis") else ""
             h2 = list(history) + [item.to_input_item() for item in r_j.new_items]
-            SMR = {"SMR_E": "eustache", "SMR_R": "marguerite", "SMR_CSR": "luther", "SMR_SH": "chan"}
-            r = await _run(a.get(SMR.get(smr_axis, ""), a["jacques_ia"]), h2)
+            SMR = {"SMR_E": eustache, "SMR_R": marguerite, "SMR_CSR": luther, "SMR_SH": chan}
+            r = await _run(SMR.get(smr_axis, jacques_ia), h2)
             return r.final_output_as(str)
 
         elif category == "LEVIERS_OPTIMISATION_PROJET":
-            r_h = await _run(a["henry_json"])
+            r_h = await _run(henry_json)
             sml_axis = r_h.final_output.sml_axis if hasattr(r_h.final_output, "sml_axis") else ""
             h2 = list(history) + [item.to_input_item() for item in r_h.new_items]
-            SML = {"SML_E": "michele", "SML_R": "albert", "SML_CSR": "savannah", "SML_SH": "catherine"}
-            r = await _run(a.get(SML.get(sml_axis, ""), a["henry_ia"]), h2)
+            SML = {"SML_E": michele, "SML_R": albert, "SML_CSR": savannah, "SML_SH": catherine}
+            r = await _run(SML.get(sml_axis, henry_ia), h2)
             return r.final_output_as(str)
 
         elif category == "SOURCING_MARCHE_FOURNISSEUR":
-            r_cadrage = await _run(a["sherlock_cadrage"])
+            r_cadrage = await _run(sherlock_cadrage)
             h2 = list(history) + [item.to_input_item() for item in r_cadrage.new_items]
-            r_fast = await _run(a["sherlock_fast"], h2)
+            r_fast = await _run(sherlock_fast, h2)
             launch = r_fast.final_output.launch_deep if hasattr(r_fast.final_output, "launch_deep") else False
             if launch:
-                r_deep = await _run(a["sherlock_deep"], h2)
+                r_deep = await _run(sherlock_deep, h2)
                 return r_deep.final_output_as(str)
             return r_cadrage.final_output_as(str)
 
         elif category == "BENCHMARK_CONCURRENTIEL":
-            r_cadrage = await _run(a["freya_cadrage"])
+            r_cadrage = await _run(freya_cadrage)
             h2 = list(history) + [item.to_input_item() for item in r_cadrage.new_items]
-            r_fast = await _run(a["freya_fast"], h2)
+            r_fast = await _run(freya_fast, h2)
             launch = r_fast.final_output.launch_deep if hasattr(r_fast.final_output, "launch_deep") else False
             if launch:
-                r_deep = await _run(a["freya_deep"], h2)
+                r_deep = await _run(freya_deep, h2)
                 return r_deep.final_output_as(str)
             return r_cadrage.final_output_as(str)
 
         else:
-            r = await _run(a["cortex_routage"])
+            r = await _run(cortex_routage)
             return r.final_output_as(str)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# EXTRACTION DE TEXTE
+# EXTRACTION DE TEXTE (fichiers uploadés par l'utilisateur)
 # ═══════════════════════════════════════════════════════════════════════════════
 
 def extract_text(filename: str, content_bytes: bytes) -> str:
     ext = filename.lower().rsplit(".", 1)[-1]
     try:
         if ext == "pdf":
-            import io, PyPDF2
+            import PyPDF2
             reader = PyPDF2.PdfReader(io.BytesIO(content_bytes))
             return "\n".join(p.extract_text() or "" for p in reader.pages).strip()
         elif ext in ("docx", "doc"):
-            import io, docx
+            import docx
             doc = docx.Document(io.BytesIO(content_bytes))
             return "\n".join(p.text for p in doc.paragraphs).strip()
         elif ext in ("xlsx", "xls"):
-            import io, openpyxl
             wb = openpyxl.load_workbook(io.BytesIO(content_bytes), data_only=True)
             lines = []
             for sheet in wb.worksheets:
@@ -342,6 +277,67 @@ def extract_text(filename: str, content_bytes: bytes) -> str:
             return f"[Fichier: {filename} — format non supporté]"
     except Exception as e:
         return f"[Erreur extraction {filename}: {e}]"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# GÉNÉRATION DE FICHIERS (Excel depuis marqueurs agents)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def extract_file_markers(text: str) -> tuple:
+    pattern = r'\[FILE:EXCEL\]\s*(.*?)\s*\[/FILE\]'
+    matches = re.findall(pattern, text, re.DOTALL)
+    files = []
+    for raw_json in matches:
+        try:
+            data = json.loads(raw_json)
+            filename = data.get("filename", "export.xlsx")
+            b64 = generate_xlsx_b64(data)
+            files.append({"type": "excel", "filename": filename, "b64": b64})
+            print(f"[FILE] Excel généré: {filename}")
+        except Exception as e:
+            print(f"[FILE] Erreur génération Excel: {e}")
+    clean_text = re.sub(pattern, '', text, flags=re.DOTALL).strip()
+    return clean_text, files
+
+
+def generate_xlsx_b64(data: dict) -> str:
+    wb = openpyxl.Workbook()
+    wb.remove(wb.active)
+    header_font = Font(bold=True, color="FFFFFF", size=11)
+    header_fill = PatternFill(start_color="2B5797", end_color="2B5797", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center")
+    thin_border = Border(
+        left=Side(style="thin"), right=Side(style="thin"),
+        top=Side(style="thin"), bottom=Side(style="thin"),
+    )
+    sheets = data.get("sheets", [])
+    if not sheets:
+        sheets = [{"name": "Données", "headers": data.get("headers", []), "rows": data.get("rows", [])}]
+    for sheet_data in sheets:
+        name = sheet_data.get("name", "Feuille")[:31]
+        ws = wb.create_sheet(title=name)
+        headers = sheet_data.get("headers", [])
+        rows = sheet_data.get("rows", [])
+        for col_idx, header in enumerate(headers, 1):
+            cell = ws.cell(row=1, column=col_idx, value=str(header))
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = header_align
+            cell.border = thin_border
+        for row_idx, row_data in enumerate(rows, 2):
+            for col_idx, value in enumerate(row_data, 1):
+                cell = ws.cell(row=row_idx, column=col_idx, value=value)
+                cell.border = thin_border
+        for col_idx, header in enumerate(headers, 1):
+            max_len = len(str(header))
+            for row_data in rows:
+                if col_idx - 1 < len(row_data):
+                    max_len = max(max_len, len(str(row_data[col_idx - 1])))
+            ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 4, 50)
+    buffer = io.BytesIO()
+    wb.save(buffer)
+    buffer.seek(0)
+    return base64.b64encode(buffer.read()).decode("utf-8")
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -428,7 +424,6 @@ class InMemoryAttachmentStore(AttachmentStore):
             name = getattr(input, "name", "fichier")
             self._texts[att_id] = extract_text(name, raw)
             print(f">>> Fichier reçu: {name} ({len(raw)} bytes)")
-
         att = FileAttachment(
             id=att_id,
             thread_id=getattr(input, "thread_id", ""),
@@ -493,30 +488,36 @@ class SwottChatKitServer(ChatKitServer):
             message_text = message_text + files_ctx
 
         user_id = context.get("user_id", "anon") if isinstance(context, dict) else "anon"
-
-        # Sauvegarder le thread dans Supabase
         client_name = context.get("client_name", "") if isinstance(context, dict) else ""
         db_save_thread(thread.id, user_id, client_name)
 
-        # Charger l'historique depuis Supabase
         history = db_get_history(thread.id)
         history.append({"role": "user", "content": message_text or " "})
 
         print(f">>> [{thread.id}] user_id={user_id} msg={message_text[:80]}")
 
-        # Appel workflow
-        import re
+        # ── Appel workflow ──
         response_text = await run_workflow(history)
         response_text = re.sub(r'filecite\S+', '', response_text).strip()
 
-        # Persister dans Supabase
-        tokens = len((message_text or " ").split()) + len(response_text.split())
+        # ── Détecter et générer les fichiers ──
+        response_text, generated_files = extract_file_markers(response_text)
+
+        if generated_files:
+            print(f"[FILE] {len(generated_files)} fichier(s) détecté(s) et généré(s)")
+
+        # ── Persister dans Supabase (sans le base64) ──
+        text_for_db = response_text
+        if generated_files:
+            filenames = ", ".join(f["filename"] for f in generated_files)
+            text_for_db += f"\n\n📎 Fichier(s) généré(s) : {filenames}"
+        tokens = len((message_text or " ").split()) + len(text_for_db.split())
         db_append_message(thread.id, "user", message_text or " ")
-        db_append_message(thread.id, "assistant", response_text, tokens_used=tokens)
+        db_append_message(thread.id, "assistant", text_for_db, tokens_used=tokens)
 
         print(f">>> Réponse: {response_text[:80]}")
 
-        # Stream la réponse
+        # ── Stream la réponse texte ──
         item_id = f"msg_{uuid.uuid4().hex[:12]}"
         now = datetime.now(timezone.utc)
 
@@ -532,13 +533,25 @@ class SwottChatKitServer(ChatKitServer):
             yield AssistantMessageContentPartTextDelta(content_index=0, delta=txt)
             await asyncio.sleep(0.02)
 
+        # ── Stream les fichiers générés ──
+        for f in generated_files:
+            file_html = (
+                f'\n\n<!--SWOTT_FILE:{json.dumps({"filename": f["filename"], "type": f["type"], "b64": f["b64"]})}-->'
+            )
+            yield AssistantMessageContentPartTextDelta(content_index=0, delta=file_html)
+
+        final_text = response_text
+        if generated_files:
+            for f in generated_files:
+                final_text += f'\n\n<!--SWOTT_FILE:{json.dumps({"filename": f["filename"], "type": f["type"], "b64": f["b64"]})}-->'
+
         yield AssistantMessageContentPartDone(
             content_index=0,
-            content={"type": "output_text", "text": response_text}
+            content={"type": "output_text", "text": final_text}
         )
         yield ThreadItemDoneEvent(item=AssistantMessageItem(
             id=item_id, thread_id=thread.id, created_at=now,
-            content=[AssistantMessageContent(type="output_text", text=response_text, annotations=[])]
+            content=[AssistantMessageContent(type="output_text", text=final_text, annotations=[])]
         ))
 
 
@@ -582,6 +595,7 @@ async def get_threads(user_id: str = "anon"):
     threads = db_get_threads_for_user(user_id)
     return {"user_id": user_id, "threads": threads}
 
+
 @app.get("/stats")
 async def get_stats(user_id: str = None):
     try:
@@ -589,7 +603,6 @@ async def get_stats(user_id: str = None):
             .select("user_id, client_name, thread_id") \
             .execute()
         threads = query.data
-
         stats = {}
         for t in threads:
             key = t["user_id"]
@@ -615,18 +628,12 @@ async def get_stats(user_id: str = None):
             if not r["client_name"]:
                 r["client_name"] = "—"
         result = list(stats.values())
-```
-
-Sauvegarde puis :
-```
-git add server.py
-git commit -m "Fix client_name dans /stats"
-git push
         if user_id:
             result = [r for r in result if r["user_id"] == user_id]
         return {"stats": sorted(result, key=lambda x: x["total_tokens"], reverse=True)}
     except Exception as e:
         return {"error": str(e)}
+
 
 @app.get("/")
 async def healthcheck():
