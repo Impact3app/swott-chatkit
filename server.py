@@ -542,6 +542,8 @@ class InMemoryAttachmentStore(AttachmentStore):
             self._bytes[att_id] = raw
             self._texts[att_id] = extract_text(name, raw)
             print(f">>> Fichier recu: {name} ({len(raw)} bytes)", flush=True)
+            storage_tid = thread_id if thread_id else f"no_thread_{att_id}"
+            db_upload_file(storage_tid, att_id, name, raw, mime_type)
         att = FileAttachment(
             id=att_id,
             thread_id=thread_id,
