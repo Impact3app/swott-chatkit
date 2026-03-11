@@ -604,6 +604,7 @@ class SwottChatKitServer(ChatKitServer):
                 files_ctx += f"\n[Fichier: {name}]\n{text}\n"
                 # Upload dans Supabase Storage si pas encore fait
                 raw = self.att_store._bytes.get(aid)
+                print(f"[DEBUG STORAGE] aid={aid}, has_raw={raw is not None}, name={name}", flush=True)
                 if raw and name:
                     mime = att.mime_type if att else "application/octet-stream"
                     db_upload_file(thread.id, aid, name, raw, mime)
