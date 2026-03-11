@@ -132,16 +132,17 @@ def db_upload_file(thread_id: str, att_id: str, filename: str, raw_bytes: bytes,
     """Upload un fichier dans Supabase Storage (bucket 'attachments').
     Retourne le storage_path ou '' en cas d'erreur."""
     try:
-        storage_path = f"{thread_id}/{att_id}_{filename}"
+        safe_name = filename.replace(" ", "_").replace("/", "_")
+        storage_path = f"{thread_id}/{att_id}_{safe_name}"
         supabase.storage.from_("attachments").upload(
             path=storage_path,
             file=raw_bytes,
             file_options={"content-type": mime_type}
         )
-        print(f"[Storage] Fichier uploade: {storage_path}")
+        print(f"[Storage] Fichier uploade: {storage_path}", flush=True)
         return storage_path
     except Exception as e:
-        print(f"[Storage] Erreur upload: {e}")
+        print(f"[Storage] Erreur upload: {e}", flush=True)
         return ""
 
 
@@ -438,7 +439,7 @@ class InMemoryAttachmentStore(AttachmentStore):
 
     async def create_attachment(self, input, context):
         att_id = f"att_{uuid.uuid4().hex[:12]}"
-        print(f"[DEBUG] create_attachment - att_id={att_id}, has_content={getattr(input, 'content', None) is not None}, name={getattr(input, 'name', '?')}")
+        print(f"[DEBUG] create_attachment - att_id={att_id}, has_content={getattr(input, 'content', None) is not None}, name={getattr(input, 'name', '?')}", flush=True)
         content = getattr(input, "content", None)
         thread_id = getattr(input, "thread_id", "")
         name = getattr(input, "name", "fichier")
@@ -447,7 +448,7 @@ class InMemoryAttachmentStore(AttachmentStore):
             raw = base64.b64decode(content) if isinstance(content, str) else content
             self._bytes[att_id] = raw
             self._texts[att_id] = extract_text(name, raw)
-            print(f">>> Fichier recu: {name} ({len(raw)} bytes)")
+            print(f">>> Fichier recu: {name} ({len(raw)} bytes)", flush=True)
             # Upload dans Supabase Storage (bucket prive 'attachments')
             db_upload_file(thread_id, att_id, name, raw, mime_type)
         att = FileAttachment(
