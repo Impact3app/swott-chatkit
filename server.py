@@ -302,23 +302,41 @@ def extract_text(filename: str, content_bytes: bytes) -> str:
 
 
 # =============================================================================
-# GENERATION DE FICHIERS (Excel depuis marqueurs agents)
+# GENERATION DE FICHIERS (Excel + Word depuis marqueurs agents)
 # =============================================================================
 
 def extract_file_markers(text: str) -> tuple:
-    pattern = r'\[FILE:EXCEL\]\s*(.*?)\s*\[/FILE\]'
-    matches = re.findall(pattern, text, re.DOTALL)
     files = []
-    for raw_json in matches:
+
+    # Detecter [FILE:EXCEL]...[/FILE]
+    excel_pattern = r'\[FILE:EXCEL\]\s*(.*?)\s*\[/FILE\]'
+    for raw_json in re.findall(excel_pattern, text, re.DOTALL):
         try:
             data = json.loads(raw_json)
             filename = data.get("filename", "export.xlsx")
             b64 = generate_xlsx_b64(data)
             files.append({"type": "excel", "filename": filename, "b64": b64})
-            print(f"[FILE] Excel genere: {filename}")
+            print(f"[FILE] Excel genere: {filename}", flush=True)
         except Exception as e:
-            print(f"[FILE] Erreur generation Excel: {e}")
-    clean_text = re.sub(pattern, '', text, flags=re.DOTALL).strip()
+            print(f"[FILE] Erreur generation Excel: {e}", flush=True)
+
+    # Detecter [FILE:WORD]...[/FILE]
+    word_pattern = r'\[FILE:WORD\]\s*(.*?)\s*\[/FILE\]'
+    for raw_json in re.findall(word_pattern, text, re.DOTALL):
+        try:
+            data = json.loads(raw_json)
+            filename = data.get("filename", "document.docx")
+            b64 = generate_docx_b64(data)
+            files.append({"type": "word", "filename": filename, "b64": b64})
+            print(f"[FILE] Word genere: {filename}", flush=True)
+        except Exception as e:
+            print(f"[FILE] Erreur generation Word: {e}", flush=True)
+
+    # Nettoyer le texte
+    clean_text = re.sub(excel_pattern, '', text, flags=re.DOTALL)
+    clean_text = re.sub(word_pattern, '', clean_text, flags=re.DOTALL)
+    clean_text = clean_text.strip()
+
     return clean_text, files
 
 
@@ -358,6 +376,81 @@ def generate_xlsx_b64(data: dict) -> str:
             ws.column_dimensions[get_column_letter(col_idx)].width = min(max_len + 4, 50)
     buffer = io.BytesIO()
     wb.save(buffer)
+    buffer.seek(0)
+    return base64.b64encode(buffer.read()).decode("utf-8")
+
+
+def generate_docx_b64(data: dict) -> str:
+    """
+    Genere un fichier Word (.docx) a partir du JSON structure.
+
+    Format JSON attendu :
+    {
+      "filename": "document.docx",
+      "content": [
+        {"type": "title", "text": "Titre principal"},
+        {"type": "heading1", "text": "Section 1"},
+        {"type": "paragraph", "text": "Texte du paragraphe..."},
+        {"type": "heading2", "text": "Sous-section 1.1"},
+        {"type": "paragraph", "text": "Autre texte..."},
+        {"type": "bullets", "items": ["Point 1", "Point 2", "Point 3"]},
+        {"type": "numbered", "items": ["Etape 1", "Etape 2", "Etape 3"]}
+      ]
+    }
+    """
+    import docx
+    from docx.shared import Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+
+    doc = docx.Document()
+
+    # Style par defaut
+    style = doc.styles['Normal']
+    style.font.name = 'Arial'
+    style.font.size = Pt(11)
+
+    content_blocks = data.get("content", [])
+
+    for block in content_blocks:
+        block_type = block.get("type", "paragraph")
+        text = block.get("text", "")
+
+        if block_type == "title":
+            p = doc.add_heading(text, level=0)
+            p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
+        elif block_type == "heading1":
+            doc.add_heading(text, level=1)
+
+        elif block_type == "heading2":
+            doc.add_heading(text, level=2)
+
+        elif block_type == "heading3":
+            doc.add_heading(text, level=3)
+
+        elif block_type == "paragraph":
+            doc.add_paragraph(text)
+
+        elif block_type == "bullets":
+            items = block.get("items", [])
+            for item in items:
+                doc.add_paragraph(item, style='List Bullet')
+
+        elif block_type == "numbered":
+            items = block.get("items", [])
+            for item in items:
+                doc.add_paragraph(item, style='List Number')
+
+        elif block_type == "pagebreak":
+            doc.add_page_break()
+
+        else:
+            # Fallback : traiter comme paragraphe
+            if text:
+                doc.add_paragraph(text)
+
+    buffer = io.BytesIO()
+    doc.save(buffer)
     buffer.seek(0)
     return base64.b64encode(buffer.read()).decode("utf-8")
 
