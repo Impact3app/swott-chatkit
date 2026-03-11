@@ -542,8 +542,6 @@ class InMemoryAttachmentStore(AttachmentStore):
             self._bytes[att_id] = raw
             self._texts[att_id] = extract_text(name, raw)
             print(f">>> Fichier recu: {name} ({len(raw)} bytes)", flush=True)
-            # Upload dans Supabase Storage (bucket prive 'attachments')
-            db_upload_file(thread_id, att_id, name, raw, mime_type)
         att = FileAttachment(
             id=att_id,
             thread_id=thread_id,
@@ -604,6 +602,11 @@ class SwottChatKitServer(ChatKitServer):
                 text = self.att_store.get_text(aid)
                 name = att.name if att else aid
                 files_ctx += f"\n[Fichier: {name}]\n{text}\n"
+                # Upload dans Supabase Storage si pas encore fait
+                raw = self.att_store._bytes.get(aid)
+                if raw and name:
+                    mime = att.mime_type if att else "application/octet-stream"
+                    db_upload_file(thread.id, aid, name, raw, mime)
             files_ctx += "---FIN DES DOCUMENTS---\n"
             message_text = message_text + files_ctx
 
